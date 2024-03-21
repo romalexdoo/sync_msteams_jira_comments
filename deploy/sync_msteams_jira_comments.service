@@ -1,0 +1,13 @@
+[Unit]
+Description=sync_msteams_jira_comments
+StartLimitBurst=0
+StartLimitIntervalSec=0
+
+[Service]
+WorkingDirectory=/opt/sync_msteams_jira_comments
+ExecStart=/opt/sync_msteams_jira_comments/sync_msteams_jira_comments.sh
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
