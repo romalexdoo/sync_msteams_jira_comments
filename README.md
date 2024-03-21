@@ -63,8 +63,8 @@ You would need a web server with DNS name available from internet.
  2. Try to build-and-run using `./backend.sh` script (for Windows environment you'll have to translate sh-script to bat-file or to use WSL)
  3. Sometimes it's needed to install extra libraries, for ex., last time we had to install libssl-dev on our Ubuntu server
  4. When build is successful, create folder `/opt/sync_msteams_jira_comments`
- 5. Copy `.env` file from `deploy` source folder
- 6. Edit .env file with:
+ 5. Copy and rename `.env_example` file from `deploy` source folder to `/opt/sync_msteams_jira_comments/.env`
+ 6. Edit `.env` file with:
 	 - `API_ADDR` = `0.0.0.0:443` (for direct requests) or `127.0.0.1:<port>` (for proxy requests)
 	 - `SHUTDOWN_TIMEOUT` = timeout for graceful stop the app if not yet stopped
 	 - `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` you've got them when setting up Microsoft API
