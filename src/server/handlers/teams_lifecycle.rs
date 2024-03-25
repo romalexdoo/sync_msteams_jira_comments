@@ -38,10 +38,7 @@ pub async fn handler(
     if let Some(Json(request)) = req {
         let mut tx = graph_api.state.lock().await;
         
-        let token = match tx.token.get() {
-            Ok(t) => t,
-            Err(_) => tx.token.renew(&graph_api.client, &graph_api.config).await.map_err(Error::c500).context("Failed to get token")?,
-        };
+        let token = tx.token.renew(&graph_api.client, &graph_api.config).await.map_err(Error::c500).context("Failed to get token")?;
 
         for value in request.value {
             tx.subscription.check_client_secret(&value.client_state).map_err(Error::c500).context("Failed to check secret")?;
