@@ -195,4 +195,21 @@ impl JiraComment {
 
         Ok(())
     }
+
+    pub async fn get(jira_api: &JiraAPIShared, issue_id: &String, comment_id: &String) -> Result<Self> {
+        Ok(
+            jira_api.client
+                .get(format!("{}/rest/api/2/issue/{}/comment/{}", jira_api.config.base_url, issue_id, comment_id))
+                .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
+                .query(&[("expand", "properties")])
+                .send()
+                .await
+                .context("Failed to get comments issue request")?
+                .error_for_status()
+                .context("Get comments request bad status")?
+                .json::<JiraComment>()
+                .await
+                .context("Parse get comments response")?
+        )
+    }
 }

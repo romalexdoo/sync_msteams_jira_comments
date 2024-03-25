@@ -11,7 +11,7 @@ use serde_json::Value;
 use sha2::Sha256;
 type HmacSha256 = Hmac<Sha256>;
 
-use crate::jira_api::comment::{self, JiraComment};
+use crate::jira_api::comment::JiraComment;
 use crate::jira_api::issue::Issue;
 use crate::jira_api::model::JiraAPIShared;
 use crate::ms_graph_api::model::MSGraphAPIShared;
@@ -145,8 +145,9 @@ println!("{:#?}", request.comment);
 
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
         let reply_body = parse_markdown(request.comment.body.as_str());
+        let comment = JiraComment::get(jira_api, &issue.get_id(), &request.comment.id).await?;
 
-        if let Some(reply_id) = request.comment.get_reply_id() {
+        if let Some(reply_id) = comment.get_reply_id() {
             graph_api
                 .edit_reply(&message_id, &reply_id, &reply_body)
                 .await
@@ -157,7 +158,9 @@ println!("{:#?}", request.comment);
                 .await
                 .context("Failed to add reply to the channel")?
                 .id;
-            request.comment.add_reply_id(jira_api, &reply_id).await?;
+println!("reply_id");
+            comment.add_reply_id(jira_api, &reply_id).await?;
+println!("1");
         }
     }
 
