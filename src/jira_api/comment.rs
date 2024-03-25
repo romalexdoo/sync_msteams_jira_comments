@@ -6,15 +6,19 @@ use crate::ms_graph_api::{message::TeamsAttachment, model::MSGraphAPIShared};
 
 use super::{
     attachment::{add_attachments_urls_to_description, find_old_attached_images, replace_attachments, replace_images_in_description}, 
-    issue::{get_jira_user_id, Issue}, 
-    model::JiraAPIShared
+    issue::Issue, 
+    model::JiraAPIShared, user::{get_jira_user_id, JiraUser},
 };
+
+const PROPERTY_KEY: &str = "teams_id";
 
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JiraComment {
     pub id: String,
     pub body: String,
+    pub update_author: JiraUser,
     pub properties: Option<Vec<JiraCommentProperty>>,
 }
 
@@ -60,7 +64,7 @@ impl JiraComment {
             "body": description_v2.clone(),
             "properties": [
                 {
-                    "key": "teams_id",
+                    "key": PROPERTY_KEY,
                     "value": {
                         "teams_id": reply_id
                     }
@@ -156,6 +160,38 @@ impl JiraComment {
             .context("Failed to send update comment request")?
             .error_for_status()
             .context("Update comment request bad status")?;
+
+        Ok(())
+    }
+
+    pub fn get_reply_id(&self) -> Option<String> {
+        Some(
+            self
+                .properties
+                .as_ref()?
+                .iter()
+                .find(|p| p.key == PROPERTY_KEY.to_string())?
+                .value
+                .as_ref()?
+                .teams_id
+                .clone()
+            )
+    }
+
+    pub async fn add_reply_id(&self, jira_api: &JiraAPIShared, reply_id: &String) -> Result<()> {
+        let payload = json!({
+            "teams_id": reply_id
+        });
+        
+        jira_api.client
+            .put(format!("{}/rest/api/2/comment/{}/properties/{}", jira_api.config.base_url, self.id, PROPERTY_KEY))
+            .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
+            .json(&payload)
+            .send()
+            .await
+            .context("Failed to send set property request")?
+            .error_for_status()
+            .context("Set property request bad status")?;
 
         Ok(())
     }

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
 
 use crate::ms_graph_api::{message::TeamsAttachment, model::MSGraphAPIShared};
@@ -7,7 +7,7 @@ use crate::ms_graph_api::{message::TeamsAttachment, model::MSGraphAPIShared};
 use super::{
     attachment::{add_attachments_urls_to_description, find_old_attached_images, replace_attachments, replace_images_in_description, JiraAttachment}, 
     // comment::JiraComment, 
-    model::JiraAPIShared,
+    model::JiraAPIShared, user::get_jira_user_id,
 };
 
 
@@ -17,6 +17,7 @@ pub struct Issue {
     key: String,
     // #[serde(rename = "self")]
     // url: String,
+    #[serde(deserialize_with = "deserialize_issue_fields")]
     fields: Option<IssueFields>,
 }
 
@@ -27,6 +28,7 @@ struct IssueFields {
     // comment: IssueCommentField,
     status: IssueStatus,
     // summary: String,
+    teams_link: String,
 }
 
 // #[derive(Deserialize)]
@@ -38,14 +40,6 @@ struct IssueFields {
 struct IssueStatus {
     name: String,
 }
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct UserResponse {
-    account_id: String,
-    email_address: Option<String>,
-}
-
 
 impl Issue {
     pub fn get_id(&self) -> String {
@@ -68,10 +62,16 @@ impl Issue {
             .map(|f| f.description.clone())
     }
 
-    pub fn get_status(&self) -> String {
+    pub fn get_status(&self) -> Option<String> {
         self.fields
             .as_ref()
-            .map_or(String::new(), |f| f.status.name.clone())
+            .map(|f| f.status.name.clone())
+    }
+
+    pub fn get_teams_link(&self) -> Option<String> {
+        self.fields
+            .as_ref()
+            .map(|f| f.teams_link.clone())
     }
     
     pub async fn create_or_update (
@@ -204,6 +204,26 @@ impl Issue {
         Ok(Some(issue))
     }
 
+    pub async fn get_issue(
+        jira_api: &JiraAPIShared, 
+        issue_id: &String,
+    ) -> Result<Self> {
+        let issue = jira_api.client
+            .get(format!("{}/rest/api/2/issue/{}", jira_api.config.base_url, issue_id))
+            .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
+            .query(&[("fields", "attachment,description,comment,status,summary")])
+            .send()
+            .await
+            .context("Failed to send search issue request")?
+            .error_for_status()
+            .context("Search request bad status")?
+            .json::<Issue>()
+            .await
+            .context("Parse search issue response")?;
+
+        Ok(issue)
+    }
+
     pub async fn update(&self, jira_api: &JiraAPIShared, payload: &Value) -> Result<()> {
         jira_api.client
             .put(format!("{}/rest/api/2/issue/{}", jira_api.config.base_url, self.id))
@@ -219,45 +239,34 @@ impl Issue {
     }
 }
 
-pub async fn get_jira_user_id(jira_api: &JiraAPIShared, reporter_email: &String) -> Result<String> {
-    let mut page = 0;
-    let mut result = String::new();
-
-    loop {
-        let users = jira_api.client
-            .get(format!("{}/rest/api/3/users", jira_api.config.base_url))
-            .query(&[("startAt", page * 50), ("maxResults", 50)])
-            .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
-            .send()
-            .await
-            .context("Failed to send get reporter request")?
-            .error_for_status()
-            .context("Get reporter request bad status")?
-            .json::<Vec<UserResponse>>()
-            .await
-            .context("Parse get reporter response")?;
-        
-        if users.len() == 0 {
-            break;
-        }
-
-        let reporter = users
-            .iter()
-            .find(|u| u.email_address.clone().unwrap_or_default().to_lowercase() == *reporter_email.to_lowercase());
-
-        if reporter.is_some() {
-            result = reporter.unwrap().account_id.clone();
-            break;
-        };
-
-        page += 1;
-    };
-
-    Ok(result)
-}
-
 impl IssueStatus {
     pub fn is_final(&self) -> bool {
         self.name.to_lowercase() == "Done".to_lowercase() || self.name.to_lowercase() == "Rejected".to_lowercase()
+    }
+}
+
+fn deserialize_issue_fields<'de, D>(deserializer: D) -> Result<Option<IssueFields>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let env_var_name = std::env::var("JIRA_MSTEAMS_LINK_FIELD_NAME").unwrap_or(String::from("teamsLink"));
+    let v: Value = Deserialize::deserialize(deserializer)?;
+
+    if let Some(map) = v.as_object() {
+        let mut fields_map = serde_json::Map::new();
+        for (k, v) in map {
+            // For every key in the JSON, if it matches the dynamic `teams_link` field,
+            // remap it to "teams_link". Otherwise, use the key as is.
+            if k == &env_var_name {
+                fields_map.insert("teams_link".to_string(), v.clone());
+            } else {
+                fields_map.insert(k.clone(), v.clone());
+            }
+        }
+        let fields: IssueFields = serde_json::from_value(Value::Object(fields_map))
+            .map_err(serde::de::Error::custom)?;
+        Ok(Some(fields))
+    } else {
+        Err(serde::de::Error::custom("expected a map for fields"))
     }
 }

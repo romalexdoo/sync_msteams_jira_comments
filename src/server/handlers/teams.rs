@@ -71,7 +71,7 @@ pub async fn handler(
                             &user_email, 
                             &message.attachments,
                             &token,
-                            &parent_message.web_url,
+                            &parent_message.web_url.unwrap_or_default(),
                             &reply_id,
                             &graph_api,
                             &message_id.unwrap(),
@@ -89,7 +89,7 @@ pub async fn handler(
                             &user_email, 
                             &message.attachments,
                             &token,
-                            &message.web_url,
+                            &message.web_url.unwrap_or_default(),
                             &graph_api,
                             &message_id_unwrapped,
                         )

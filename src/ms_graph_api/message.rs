@@ -6,7 +6,8 @@ use uuid::Uuid;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MsGraphMessage {
-    pub web_url: String,
+    pub id: String,
+    pub web_url: Option<String>,
     pub from: MessageFrom,
     pub body: MessageBody,
     pub attachments: Vec<TeamsAttachment>,

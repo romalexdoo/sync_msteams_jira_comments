@@ -5,11 +5,13 @@ use axum::http::{header::HeaderMap, HeaderName, StatusCode};
 use axum::response::Result as ApiResult;
 use axum::Extension;
 use hmac::{Hmac, Mac};
+use markdown_to_html_parser::parse_markdown;
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::Sha256;
 type HmacSha256 = Hmac<Sha256>;
 
+use crate::jira_api::comment::JiraComment;
 use crate::jira_api::issue::Issue;
 use crate::jira_api::model::JiraAPIShared;
 use crate::ms_graph_api::model::MSGraphAPIShared;
@@ -17,9 +19,22 @@ use crate::server::error::{Context as ApiContext, Error as ApiError};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Request {
+pub struct IssueRequest {
     pub issue: Issue,
     pub changelog: ChangeLog,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommentRequest {
+    pub comment: JiraComment,
+    pub issue: IssueId,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueId {
+    pub id: String,
 }
 
 #[derive(Deserialize)]
@@ -58,31 +73,19 @@ pub async fn handler(
     let json_payload = serde_json::from_slice::<Value>(&payload)
         .map_err(ApiError::c500)
         .context("Failed to deserialize payload")?;
-println!("{:#?}", json_payload);
-    let request = serde_json::from_slice::<Request>(&payload)
-        .map_err(ApiError::c500)
-        .context("Failed to deserialize payload")?;
 
-    let teams_link = &json_payload["issue"]["fields"]
-        .get(jira_api.config.msteams_link_field_name.clone())
-        .and_then(|t| t.as_str());
+    let webhook_event = &json_payload
+        .get("webhookEvent")
+        .and_then(|t| t.as_str())
+        .unwrap_or_default();
 
-    if let Some(link) = teams_link {
-        if request
-            .changelog
-            .items
-            .iter()
-            .any(|i| i.field.to_lowercase() == String::from("status"))
-        {
-            if let Some(message_id) = extract_message_id_from_url(link.to_string()) {
-                let reply_body = format!("Статус задачи изменён на {}", request.issue.get_status());
-                graph_api
-                    .reply_to_issue(&message_id, &reply_body)
-                    .await
-                    .map_err(ApiError::c500)
-                    .context("Failed to send notification to the channel")?;
-            }
-        }
+    match *webhook_event {
+        "comment_created" | "comment_updated" => { 
+                parse_comment(payload, &jira_api, &graph_api).await.map_err(ApiError::c500).context("Failed to parse comment")?; 
+            },
+        _ => { 
+                parse_issue(payload, &graph_api).await.map_err(ApiError::c500).context("Failed to parse issue")?;
+            },
     }
 
     Ok(StatusCode::OK)
@@ -126,4 +129,61 @@ fn get_signature_from_headers(headers: HeaderMap) -> Result<Signature> {
         method: parts[0].to_string(),
         value: parts[1].to_string(),
     })
+}
+
+async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSGraphAPIShared) -> Result<()> {
+    let request = serde_json::from_slice::<CommentRequest>(&payload)
+        .context("Failed to deserialize payload")?;
+
+    let author_email = request.comment.update_author.get_email(jira_api).await.context("Failed to get author email")?.unwrap_or_default();
+
+    if author_email == jira_api.config.user {
+        return Ok(());
+    }
+
+    let issue = Issue::get_issue(jira_api, &request.issue.id).await.context("Failed to get comment issue by id")?;
+
+    if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
+        let reply_body = parse_markdown(request.comment.body.as_str());
+
+        if let Some(reply_id) = request.comment.get_reply_id() {
+            graph_api
+                .edit_reply(&message_id, &reply_id, &reply_body)
+                .await
+                .context("Failed to update reply in channel")?;
+        } else {
+            let reply_id = graph_api
+                .reply_to_issue(&message_id, &reply_body)
+                .await
+                .context("Failed to add reply to the channel")?
+                .id;
+            request.comment.add_reply_id(jira_api, &reply_id).await?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn parse_issue(payload: Bytes, graph_api: &MSGraphAPIShared) -> Result<()> {
+    let request = serde_json::from_slice::<IssueRequest>(&payload)
+        .context("Failed to deserialize payload")?;
+
+    if let Some(link) = request.issue.get_teams_link() {
+        if request
+            .changelog
+            .items
+            .iter()
+            .any(|i| i.field.to_lowercase() == String::from("status"))
+        {
+            if let Some(message_id) = extract_message_id_from_url(link.to_string()) {
+                let reply_body = format!("Статус задачи изменён на {}", request.issue.get_status().unwrap_or_default());
+                graph_api
+                    .reply_to_issue(&message_id, &reply_body)
+                    .await
+                    .context("Failed to send notification to the channel")?;
+            }
+        }
+    }
+
+    Ok(())
 }

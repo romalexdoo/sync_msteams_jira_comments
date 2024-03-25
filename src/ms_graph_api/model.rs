@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use crate::utils::get_reqwest_client;
 
-use super::cfg::Config;
+use super::{cfg::Config, message::MsGraphMessage};
 use super::delegated_token::GrantedToken;
 use super::subscription::Subscription;
 use super::token::ApplicationToken;
@@ -101,7 +101,35 @@ impl MSGraphAPI {
         }
     }
 
-    pub async fn reply_to_issue(&self, message_id: &String, reply_body: &String) -> Result<()> {
+    pub async fn reply_to_issue(&self, message_id: &String, reply_body: &String) -> Result<MsGraphMessage> {
+        let token = self.granted_token.read().await.get()?;
+
+        let payload = json!(
+            {
+                "body": {
+                    "contentType": "html",
+                    "content": reply_body
+                }
+            }        
+        );
+
+        let response = self.client
+            .post(format!("https://graph.microsoft.com/v1.0/teams/{}/channels/{}/messages/{}/replies", self.config.group_id, self.config.channel_id, message_id))
+            .bearer_auth(token)
+            .json(&payload)
+            .send()
+            .await
+            .context("Failed to send reply to issue request")?
+            .error_for_status()
+            .context("Reply to issue request bad status")?
+            .json::<MsGraphMessage>()
+            .await
+            .context("Parse reply to issue response")?;
+
+        Ok(response)
+    }
+
+    pub async fn edit_reply(&self, message_id: &String, reply_id: &String, reply_body: &String) -> Result<()> {
         let token = self.granted_token.read().await.get()?;
 
         let payload = json!(
@@ -114,14 +142,14 @@ impl MSGraphAPI {
         );
 
         self.client
-            .post(format!("https://graph.microsoft.com/v1.0/teams/{}/channels/{}/messages/{}/replies", self.config.group_id, self.config.channel_id, message_id))
+            .patch(format!("https://graph.microsoft.com/v1.0/teams/{}/channels/{}/messages/{}/replies{}", self.config.group_id, self.config.channel_id, message_id, reply_id))
             .bearer_auth(token)
             .json(&payload)
             .send()
             .await
-            .context("Failed to send get user mail request")?
+            .context("Failed to send reply edit request")?
             .error_for_status()
-            .context("Get user mail request bad status")?;
+            .context("Reply edit request bad status")?;
 
         Ok(())
     }
