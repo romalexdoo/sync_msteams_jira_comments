@@ -26,7 +26,7 @@ impl GrantedToken {
     pub async fn set_first_time(&mut self, client: &Client, config: &Config, code: String) -> Result<()> {
         let form = [
             ("client_id", config.client_id.as_str()),
-            ("scope", "ChannelMessage.Send"),
+            ("scope", "ChannelMessage.Send ChannelMessage.ReadWrite"),
             ("code", code.as_str()),
             ("redirect_uri", config.oauth_url.as_str()),
             ("grant_type", "authorization_code"),
@@ -70,7 +70,7 @@ impl GrantedToken {
         let refresh_token = self.refresh_token.clone();
         let form = [
             ("client_id", config.client_id.as_str()),
-            ("scope", "ChannelMessage.Send"),
+            ("scope", "ChannelMessage.Send ChannelMessage.ReadWrite"),
             ("refresh_token", refresh_token.as_str()),
             ("grant_type", "refresh_token"),
             // ("client_secret", config.client_secret.as_str()),

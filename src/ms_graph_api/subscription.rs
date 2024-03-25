@@ -67,7 +67,7 @@ impl Subscription {
             bail!(response.text().await?)
         }
 
-        let auth_url = format!("https://login.microsoftonline.com/{}/oauth2/v2.0/authorize?client_id={}&scope=offline_access%20ChannelMessage.Send&response_type=code&redirect_uri={}&response_mode=form_post&state={}", config.tenant_id, config.client_id, config.oauth_url, subscription_secret);
+        let auth_url = format!("https://login.microsoftonline.com/{}/oauth2/v2.0/authorize?client_id={}&scope=offline_access%20ChannelMessage.Send%20ChannelMessage.ReadWrite&response_type=code&redirect_uri={}&response_mode=form_post&state={}", config.tenant_id, config.client_id, config.oauth_url, subscription_secret);
         println!("{auth_url}");
         
         let content = format!("Please, go to email below<BR><a href=\"{}\">{}</a>", auth_url, auth_url);

@@ -64,8 +64,8 @@ pub async fn handler(
                 if let Some(reply_id) = reply_id {
                     let message_url = &value.resource.split("/replies").next().unwrap_or_default().to_string();
                     let parent_message = MsGraphMessage::get(&graph_api.client, message_url, &token).await.map_err(Error::c500).context("Failed to get Message")?;
-println!("JiraComment::create_or_update");
-                    JiraComment::create_or_update(
+
+                    let result = JiraComment::create_or_update(
                             &jira_api,
                             &message.body.content, 
                             &user_email, 
@@ -78,7 +78,11 @@ println!("JiraComment::create_or_update");
                         )
                         .await
                         .map_err(Error::c500)
-                        .context("Failed to create comment in Jira")?;
+                        .context("Failed to create comment in Jira");
+                    if let Err(e) = result {
+                        println!("{:?}", e.to_string());
+                        return Err(e.into());
+                    }
                 } else {
                     let message_id_unwrapped = message_id.unwrap();
                     
