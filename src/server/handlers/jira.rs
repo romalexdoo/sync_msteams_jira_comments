@@ -158,9 +158,11 @@ println!("{:#?}", request.comment);
                 .await
                 .context("Failed to add reply to the channel")?
                 .id;
-println!("reply_id");
-            comment.add_reply_id(jira_api, &reply_id).await?;
-println!("1");
+            let response = comment.add_reply_id(jira_api, &reply_id).await;
+            if let Err(e) = response {
+                println!("{:?}", e);
+                return Err(e);
+            }
         }
     }
 
