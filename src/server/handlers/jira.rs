@@ -154,7 +154,7 @@ println!("2-3");
         }
     };
 println!("2-4");
-println!("{:#?}", issue);
+// println!("{:#?}", issue);
 println!("{}", std::env::var("JIRA_MSTEAMS_LINK_FIELD_NAME").unwrap_or(String::from("teamsLink")));
 
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
