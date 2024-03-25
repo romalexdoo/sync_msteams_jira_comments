@@ -30,7 +30,7 @@ Here we'll configure our tool to have access to MS Graph API. Actually, you can 
     - `User.Read.All` to read user properties (we need to know user's email)
     - `Mail.Send` to send approve link to service desk mailbox
     - `ChannelMessage.Read.Group`, `ChannelMessage.Read.All` to manipulate the subscription (webhook notification about channel updates)
- 6. Click again **Add a permission**, choose **APIs my organisation uses**, find **Microsoft Graph**, click on it and this time select **Delegated permissions**. Here add `offline_access` and `ChannelMessage.Send`
+ 6. Click again **Add a permission**, choose **APIs my organisation uses**, find **Microsoft Graph**, click on it and this time select **Delegated permissions**. Here add `offline_access`, `ChannelMessage.ReadWrite` and `ChannelMessage.Send`
  7. You'll see the list of added permissions. Now click `Grant admin consent`
  8. Go to the **Authentication** on  the left and add the following url: `https://<your domain>/ms_oauth`
  9.  Go to **Overview** and copy:
@@ -47,7 +47,7 @@ Here we'll configure our tool to have access to MS Graph API. Actually, you can 
 		 - Generate secret and write it down
 		 - Edit jql query to narrow the search (for ex., `project = "IT support"`)
 		 - Below select only **Issue** –> **Updated** checkbox
- 2. Add service desk user to your support project with writes to read, create and edit issues, add and edit comments
+ 2. Add service desk user to your support project with writes to read, create and edit issues, add and edit any comment
  3. Go to this user's [Manage account page](https://id.atlassian.com/manage-profile/profile-and-visibility), goto **Security** tab, click **Create and manage API tokens** and create new token (don't forget to copy the **Token value**)
  4. Create custom field in Jira to store link to MS Teams. I suggest to make this field's type: URL to be able to easily open teams message if needed
 
@@ -87,4 +87,4 @@ You would need a web server with DNS name available from internet.
  - Add language selection (for now all responses are in Russian language)
  - Add configuration for "Final" Jira statuses
  - Add option to reopen issues in final statuses on new comments
- - Add option to transfer comments from Jira to MS Teams. Why option? Because sometimes technical team may need to leave comments without notifying users, so for now there is only one-way comments sync
+ 

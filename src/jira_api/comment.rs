@@ -48,17 +48,15 @@ impl JiraComment {
         // let description = htmltoadf::convert_html_str_to_adf_str(description.clone());
         // let description_json: Value = serde_json::from_str(description.as_str()).context("Failed to parse description JSON")?;
         let mut description_v2 = html2md::parse_html(description);
-println!("1");
+
         add_attachments_urls_to_description(&mut description_v2, attachments);
-println!("2");
+
         let images = replace_images_in_description(&mut description_v2, graph_api_token).await?;
-println!("3");
 
         let mut author_id = get_jira_user_id(jira_api, author_email).await.unwrap_or_default();
         if author_id.len() == 0 {
             author_id = author_email.clone();
         }
-println!("4");
 
         description_v2 = format!("On behalf of [~accountid:{}]:\n\n{}", author_id, description_v2);
     
@@ -80,11 +78,8 @@ println!("4");
             None => bail!("Issue not found"),
         };
 
-println!("5");
         let mut comment = JiraComment::find(jira_api, &issue.get_id(), reply_id).await?;
-println!("6");
         let comment_body = comment.as_ref().map(|com| com.body.clone()).unwrap_or_default();
-println!("7");
     
         if comment.is_none() {
             comment = Some(
@@ -107,12 +102,9 @@ println!("7");
         }
     
         let comment = comment.unwrap();
-println!("8");
     
         let old_image_names = find_old_attached_images(&comment_body);
-println!("9");
         replace_attachments(jira_api, &issue, &old_image_names, &images).await?;
-println!("10");
     
         Ok(comment)
     }
