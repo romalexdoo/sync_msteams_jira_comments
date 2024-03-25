@@ -34,6 +34,7 @@ pub async fn handler(
     State(graph_api): State<MSGraphAPIShared>,
     req: Option<Json<Request>>
 ) -> Result<impl IntoResponse> {
+    let mut reply_status = StatusCode::ACCEPTED;
 
     if let Some(Json(request)) = req {
         let mut tx = graph_api.state.lock().await;
@@ -64,9 +65,12 @@ pub async fn handler(
     };
 
     let response = match query {
-        Some(Query(q)) => q.validation_token,
+        Some(Query(q)) => {
+            reply_status = StatusCode::OK;
+            q.validation_token
+        },
         None => String::new(),
     };
 
-    Ok((StatusCode::ACCEPTED, response))
+    Ok((reply_status, response))
 }
