@@ -11,7 +11,7 @@ use serde_json::Value;
 use sha2::Sha256;
 type HmacSha256 = Hmac<Sha256>;
 
-use crate::jira_api::comment::JiraComment;
+use crate::jira_api::comment::{self, JiraComment};
 use crate::jira_api::issue::Issue;
 use crate::jira_api::model::JiraAPIShared;
 use crate::ms_graph_api::model::MSGraphAPIShared;
@@ -73,12 +73,11 @@ pub async fn handler(
     let json_payload = serde_json::from_slice::<Value>(&payload)
         .map_err(ApiError::c500)
         .context("Failed to deserialize payload")?;
-println!("1");
+
     let webhook_event = &json_payload
         .get("webhookEvent")
         .and_then(|t| t.as_str())
         .unwrap_or_default();
-println!("2");
 
     match *webhook_event {
         "comment_created" | "comment_updated" => { 
@@ -88,7 +87,6 @@ println!("2");
                 parse_issue(payload, &graph_api).await.map_err(ApiError::c500).context("Failed to parse issue")?;
             },
     }
-println!("3");
 
     Ok(StatusCode::OK)
 }
@@ -136,52 +134,32 @@ fn get_signature_from_headers(headers: HeaderMap) -> Result<Signature> {
 async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSGraphAPIShared) -> Result<()> {
     let request = serde_json::from_slice::<CommentRequest>(&payload)
         .context("Failed to deserialize payload")?;
-println!("2-1");
-
+println!("{:#?}", request.comment);
     let author_email = request.comment.update_author.get_email(jira_api).await.context("Failed to get author email")?.unwrap_or_default();
-println!("2-2");
 
     if author_email == jira_api.config.user {
         return Ok(());
     }
-println!("2-3");
-    let issue = Issue::get_issue(jira_api, &request.issue.id).await.context("Failed to get comment issue by id");
-    let issue = match issue {
-        Ok(i) => i,
-        Err(e) => {
-            println!("{:?}", e);
-            return Err(e);
-        }
-    };
-println!("2-4");
-// println!("{:#?}", issue);
-println!("{}", std::env::var("JIRA_MSTEAMS_LINK_FIELD_NAME").unwrap_or(String::from("teamsLink")));
+
+    let issue = Issue::get_issue(jira_api, &request.issue.id).await.context("Failed to get comment issue by id")?;
 
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
-println!("2-5");
         let reply_body = parse_markdown(request.comment.body.as_str());
-println!("2-6");
 
         if let Some(reply_id) = request.comment.get_reply_id() {
-println!("2-7");
             graph_api
                 .edit_reply(&message_id, &reply_id, &reply_body)
                 .await
                 .context("Failed to update reply in channel")?;
-println!("2-8");
         } else {
-println!("2-9");
             let reply_id = graph_api
                 .reply_to_issue(&message_id, &reply_body)
                 .await
                 .context("Failed to add reply to the channel")?
                 .id;
-println!("2-10");
             request.comment.add_reply_id(jira_api, &reply_id).await?;
-println!("2-11");
         }
     }
-println!("2-12");
 
     Ok(())
 }

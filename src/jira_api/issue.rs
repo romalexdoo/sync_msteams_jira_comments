@@ -256,7 +256,6 @@ where
         for (k, v) in map {
             // For every key in the JSON, if it matches the dynamic `teams_link` field,
             // remap it to "teams_link". Otherwise, use the key as is.
-            println!("{k}");
             if k == &env_var_name {
                 fields_map.insert("teams_link".to_string(), v.clone());
             } else {
