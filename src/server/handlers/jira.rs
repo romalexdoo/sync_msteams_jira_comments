@@ -5,7 +5,6 @@ use axum::http::{header::HeaderMap, HeaderName, StatusCode};
 use axum::response::Result as ApiResult;
 use axum::Extension;
 use hmac::{Hmac, Mac};
-use markdown_to_html_parser::parse_markdown;
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::Sha256;
@@ -134,7 +133,6 @@ fn get_signature_from_headers(headers: HeaderMap) -> Result<Signature> {
 async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSGraphAPIShared) -> Result<()> {
     let request = serde_json::from_slice::<CommentRequest>(&payload)
         .context("Failed to deserialize payload")?;
-println!("{:#?}", request.comment);
     let author_email = request.comment.update_author.get_email(jira_api).await.context("Failed to get author email")?.unwrap_or_default();
 
     if author_email == jira_api.config.user {
@@ -144,8 +142,11 @@ println!("{:#?}", request.comment);
     let issue = Issue::get_issue(jira_api, &request.issue.id).await.context("Failed to get comment issue by id")?;
 
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
-        let reply_body = parse_markdown(request.comment.body.as_str());
+        let reply_body = Markdown_to_HTML_rs::replace_all(&request.comment.body);
         let comment = JiraComment::get(jira_api, &issue.get_id(), &request.comment.id).await?;
+
+println!("Comment ID self: {}", request.comment.id);
+println!("Comment ID API: {}", comment.id);
 
         if let Some(reply_id) = comment.get_reply_id() {
             graph_api

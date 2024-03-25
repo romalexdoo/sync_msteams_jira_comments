@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+Markdown-to-HTML-rs = "0.1"
 anyhow = "1.0"
 axum = "0.7"
 axum-server = { version = "0.6", features = ["tls-rustls"] }
@@ -18,7 +19,6 @@ html2md = "0.2.14"
 htmltoadf = "0.1"
 hyper = { version = "1.0", features = ["full"] }
 hyper-util = { version = "0.1" }
-markdown_to_html_parser = "0.1"
 regex = "1.10"
 reqwest = { version = "0.11", features = ["rustls-tls", "cookies", "gzip", "json", "multipart"] }
 rustls-pemfile = "1.0"
