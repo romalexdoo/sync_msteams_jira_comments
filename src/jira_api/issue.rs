@@ -84,7 +84,7 @@ impl Issue {
         message_url: &String,
         graph_api: &MSGraphAPIShared,
         message_id: &String,
-    ) -> Result<Self> {
+    ) -> Result<(Self, bool)> {
         let mut summary = summary.clone();
     
         if summary.len() == 0 {
@@ -132,8 +132,9 @@ impl Issue {
         }
     
         let mut issue = Issue::find(jira_api, message_url, graph_api, message_id).await?;
+        let issue_exists = issue.is_some();
     
-        if issue.is_none() {
+        if !issue_exists {
             issue = Some(
                     jira_api.client
                         .post(format!("{}/rest/api/2/issue", jira_api.config.base_url))
@@ -158,7 +159,7 @@ impl Issue {
         let old_image_names = find_old_attached_images(&issue.get_description().unwrap_or_default());
         replace_attachments(jira_api, &issue, &old_image_names, &images).await?;
     
-        Ok(issue)
+        Ok((issue, issue_exists))
     }
 
     pub async fn find(

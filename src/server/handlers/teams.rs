@@ -82,7 +82,7 @@ pub async fn handler(
                 } else {
                     let message_id_unwrapped = message_id.unwrap();
                     
-                    let issue = Issue::create_or_update(
+                    let (issue, issue_exists) = Issue::create_or_update(
                             &jira_api,
                             &message.subject.unwrap_or_default(), 
                             &message.body.content, 
@@ -96,14 +96,16 @@ pub async fn handler(
                         .await
                         .map_err(Error::c500)
                         .context("Failed to create Issue in Jira")?;
-                    
-                    let url = format!("{}/browse/{}", jira_api.config.base_url, issue.get_key());
 
-                    graph_api
-                        .reply_to_issue(&message_id_unwrapped, &format!("<a href=\"{}\">{}</a>", url, url))
-                        .await
-                        .map_err(Error::c500)
-                        .context("Failed to send reply for teams topic")?;
+                    if !issue_exists {
+                        let url = format!("{}/browse/{}", jira_api.config.base_url, issue.get_key());
+
+                        graph_api
+                            .reply_to_issue(&message_id_unwrapped, &format!("<a href=\"{}\">{}</a>", url, url))
+                            .await
+                            .map_err(Error::c500)
+                            .context("Failed to send reply for teams topic")?;
+                    }
                 }
             }
         }
