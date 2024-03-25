@@ -145,7 +145,7 @@ println!("2-2");
         return Ok(());
     }
 println!("2-3");
-
+println!("{}", std::env::var("JIRA_MSTEAMS_LINK_FIELD_NAME").unwrap_or(String::from("teamsLink")));
     let issue = Issue::get_issue(jira_api, &request.issue.id).await.context("Failed to get comment issue by id");
     let issue = match issue {
         Ok(i) => i,
@@ -155,6 +155,7 @@ println!("2-3");
         }
     };
 println!("2-4");
+println!("{:#?}", issue);
 
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
 println!("2-5");

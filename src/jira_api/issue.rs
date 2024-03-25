@@ -28,7 +28,7 @@ struct IssueFields {
     // comment: IssueCommentField,
     status: IssueStatus,
     // summary: String,
-    teams_link: String,
+    teams_link: Option<String>,
 }
 
 // #[derive(Deserialize)]
@@ -71,7 +71,7 @@ impl Issue {
     pub fn get_teams_link(&self) -> Option<String> {
         self.fields
             .as_ref()
-            .map(|f| f.teams_link.clone())
+            .and_then(|f| f.teams_link.clone())
     }
     
     pub async fn create_or_update (
