@@ -142,7 +142,7 @@ impl MSGraphAPI {
         );
 
         self.client
-            .patch(format!("https://graph.microsoft.com/v1.0/teams/{}/channels/{}/messages/{}/replies{}", self.config.group_id, self.config.channel_id, message_id, reply_id))
+            .patch(format!("https://graph.microsoft.com/v1.0/teams/{}/channels/{}/messages/{}/replies/{}", self.config.group_id, self.config.channel_id, message_id, reply_id))
             .bearer_auth(token)
             .json(&payload)
             .send()

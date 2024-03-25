@@ -156,11 +156,7 @@ async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSG
                 .await
                 .context("Failed to add reply to the channel")?
                 .id;
-            let response = comment.add_reply_id(jira_api, &reply_id).await;
-            if let Err(e) = response {
-                println!("{:?}", e);
-                return Err(e);
-            }
+            comment.add_reply_id(jira_api, &reply_id).await?;
         }
     }
 
