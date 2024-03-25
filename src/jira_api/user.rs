@@ -24,12 +24,49 @@ impl JiraUser {
             .query(&[("accountId", &self.account_id)])
             .send()
             .await
-            .context("Failed to send get user email request")?
+            .context("Failed to send get user email request");
+        let response = match response {
+            Ok(r) => r,
+            Err(e) => {
+                println!("{:?}", e);
+                return Err(e);
+            }
+        };
+
+        let response = response
             .error_for_status()
-            .context("Get user email bad status")?
+            .context("Get user email bad status");
+        let response = match response {
+            Ok(r) => r,
+            Err(e) => {
+                println!("{:?}", e);
+                return Err(e);
+            }
+        };
+
+        let response = response
             .json::<JiraUser>()
             .await
-            .context("Parse get user email response")?;
+            .context("Parse get user email response");
+        let response = match response {
+            Ok(r) => r,
+            Err(e) => {
+                println!("{:?}", e);
+                return Err(e);
+            }
+        };
+        // let response = jira_api.client
+        //     .get(format!("{}/rest/api/2/user/email", jira_api.config.base_url))
+        //     .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
+        //     .query(&[("accountId", &self.account_id)])
+        //     .send()
+        //     .await
+        //     .context("Failed to send get user email request")?
+        //     .error_for_status()
+        //     .context("Get user email bad status")?
+        //     .json::<JiraUser>()
+        //     .await
+        //     .context("Parse get user email response")?;
         
         Ok(response.email_address)
     }
