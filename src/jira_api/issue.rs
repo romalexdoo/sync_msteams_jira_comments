@@ -178,7 +178,7 @@ impl Issue {
         let mut response = jira_api.client
             .get(format!("{}/rest/api/2/search", jira_api.config.base_url))
             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
-            .query(&[("maxResults", "1"), ("jql", &jql), ("fields", "attachment,description,comment,status,summary")])
+            .query(&[("maxResults", "1"), ("jql", &jql)])
             .send()
             .await
             .context("Failed to send search issue request")?
@@ -211,7 +211,6 @@ impl Issue {
         let issue = jira_api.client
             .get(format!("{}/rest/api/2/issue/{}", jira_api.config.base_url, issue_id))
             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
-            .query(&[("fields", "attachment,description,comment,status,summary")])
             .send()
             .await
             .context("Failed to send search issue request")?
