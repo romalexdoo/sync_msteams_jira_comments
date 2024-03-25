@@ -213,12 +213,12 @@ impl Issue {
             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
             .send()
             .await
-            .context("Failed to send search issue request")?
+            .context("Failed to send get issue request")?
             .error_for_status()
-            .context("Search request bad status")?
+            .context("Get request bad status")?
             .json::<Issue>()
             .await
-            .context("Parse search issue response")?;
+            .context("Parse get issue response")?;
 
         Ok(issue)
     }

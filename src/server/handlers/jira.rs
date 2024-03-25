@@ -146,14 +146,10 @@ async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSG
         let comment = JiraComment::get(jira_api, &issue.get_id(), &request.comment.id).await?;
 
         if let Some(reply_id) = comment.get_reply_id() {
-            let response = graph_api
+            graph_api
                 .edit_reply(&message_id, &reply_id, &reply_body)
                 .await
-                .context("Failed to update reply in channel");
-            if let Err(e) = response {
-                println!("{:?}", e);
-                return Err(e);
-            }
+                .context("Failed to update reply in channel")?;
         } else {
             let reply_id = graph_api
                 .reply_to_issue(&message_id, &reply_body)
