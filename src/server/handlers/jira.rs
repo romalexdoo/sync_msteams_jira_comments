@@ -142,7 +142,7 @@ async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSG
     let issue = Issue::get_issue(jira_api, &request.issue.id).await.context("Failed to get comment issue by id")?;
 
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
-        let reply_body = Markdown_to_HTML_rs::replace_all(&request.comment.body);
+        let reply_body = markdown_to_html_parser::parse_markdown(request.comment.body.as_str());
         let comment = JiraComment::get(jira_api, &issue.get_id(), &request.comment.id).await?;
 
         if let Some(reply_id) = comment.get_reply_id() {
