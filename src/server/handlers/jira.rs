@@ -146,7 +146,14 @@ println!("2-2");
     }
 println!("2-3");
 
-    let issue = Issue::get_issue(jira_api, &request.issue.id).await.context("Failed to get comment issue by id")?;
+    let issue = Issue::get_issue(jira_api, &request.issue.id).await.context("Failed to get comment issue by id");
+    let issue = match issue {
+        Ok(i) => i,
+        Err(e) => {
+            println!("{:?}", e);
+            return Err(e);
+        }
+    };
 println!("2-4");
 
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
