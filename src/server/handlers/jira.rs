@@ -145,9 +145,6 @@ async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSG
         let reply_body = Markdown_to_HTML_rs::replace_all(&request.comment.body);
         let comment = JiraComment::get(jira_api, &issue.get_id(), &request.comment.id).await?;
 
-println!("Comment ID self: {}", request.comment.id);
-println!("Comment ID API: {}", comment.id);
-
         if let Some(reply_id) = comment.get_reply_id() {
             graph_api
                 .edit_reply(&message_id, &reply_id, &reply_body)

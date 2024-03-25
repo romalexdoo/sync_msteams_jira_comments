@@ -182,7 +182,8 @@ impl JiraComment {
         let payload = json!({
             "teams_id": reply_id
         });
-        
+println!("{:#?}", payload);
+println!("URL: {}", format!("{}/rest/api/2/comment/{}/properties/{}", jira_api.config.base_url, self.id, PROPERTY_KEY));
         jira_api.client
             .put(format!("{}/rest/api/2/comment/{}/properties/{}", jira_api.config.base_url, self.id, PROPERTY_KEY))
             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
