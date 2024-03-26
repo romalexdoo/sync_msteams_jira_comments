@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
 
@@ -135,8 +135,12 @@ impl Issue {
         let issue_exists = issue.is_some();
     
         if !issue_exists {
-            issue = Some(
-                    jira_api.client
+            #[derive(Deserialize)]
+            struct CreateIssueResponse {
+                id: String,
+            }
+            
+            let result = jira_api.client
                         .post(format!("{}/rest/api/2/issue", jira_api.config.base_url))
                         .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
                         .json(&payload)
@@ -145,16 +149,16 @@ impl Issue {
                         .context("Failed to send create issue request")?
                         .error_for_status()
                         .context("Create request bad status")?
-                        .json::<Issue>()
+                        .json::<CreateIssueResponse>()
                         .await
-                        .context("Parse create issue response")?
-                );
+                        .context("Parse create issue response")?;
+            issue = Issue::get_issue(jira_api, &result.id).await.ok();
         } else {
             let issue = issue.as_mut().unwrap();
             issue.update(jira_api, &payload).await?;
         }
     
-        let issue = issue.unwrap();
+        let issue = issue.ok_or(anyhow!("Failed to get created issue"))?;
     
         let old_image_names = find_old_attached_images(&issue.get_description().unwrap_or_default());
         replace_attachments(jira_api, &issue, &old_image_names, &images).await?;
