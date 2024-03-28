@@ -13,7 +13,7 @@ use crate::{
     server::error::{Context, Error}
 };
 
-use super::helpers;
+use super::helpers::{self, log_to_file};
 
 
 #[derive(Debug, Deserialize)]
@@ -82,7 +82,7 @@ pub async fn handler(
                 } else {
                     let message_id_unwrapped = message_id.unwrap();
                     
-                    let (issue, issue_exists) = Issue::create_or_update(
+                    let (issue, issue_exists) = match Issue::create_or_update(
                             &jira_api,
                             &message.subject.unwrap_or_default(), 
                             &message.body.content, 
@@ -95,7 +95,13 @@ pub async fn handler(
                         )
                         .await
                         .map_err(Error::c500)
-                        .context("Failed to create Issue in Jira")?;
+                        .context("Failed to create Issue in Jira") {
+                            Ok((i, e)) => (i, e), 
+                            Err(e) => {
+                                    log_to_file("Create or update issue in Jira", e.to_string().as_str());
+                                    return Err(e.into());
+                                },
+                        };
 
                     if !issue_exists {
                         let url = format!("{}/browse/{}", jira_api.config.base_url, issue.get_key());
