@@ -161,7 +161,7 @@ impl Issue {
         let issue = issue.ok_or(anyhow!("Failed to get created issue"))?;
     
         let old_image_names = find_old_attached_images(&issue.get_description().unwrap_or_default());
-        replace_attachments(jira_api, &issue, &old_image_names, &images).await?;
+        replace_attachments(jira_api, &issue, &old_image_names, &images).await.context("Failed to replace attachments")?;
     
         Ok((issue, issue_exists))
     }
