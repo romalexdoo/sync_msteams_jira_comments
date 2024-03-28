@@ -6,21 +6,17 @@ use super::model::JiraAPIShared;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JiraUser {
-    account_id: String,
-    display_name: Option<String>,
-    email_address: Option<String>,
+    pub account_id: String,
+    pub display_name: Option<String>,
+    pub email_address: Option<String>,
 }
 
 impl JiraUser {
-    pub fn get_display_name (&self) -> Option<String> {
-        self.display_name.clone()
-    }
-
-    pub async fn get_email(&self, jira_api: &JiraAPIShared) -> Result<Option<String>> {
+    pub async fn find_by_id(account_id: &String, jira_api: &JiraAPIShared) -> Result<Self> {
         let response = jira_api.client
             .get(format!("{}/rest/api/2/user", jira_api.config.base_url))
             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
-            .query(&[("accountId", &self.account_id)])
+            .query(&[("accountId", account_id)])
             .send()
             .await
             .context("Failed to send get user email request")?
@@ -30,11 +26,11 @@ impl JiraUser {
             .await
             .context("Parse get user email response")?;
         
-        Ok(response.email_address)
+        Ok(response)
     }
 }
 
-pub async fn get_jira_user_id(jira_api: &JiraAPIShared, reporter_email: &String) -> Result<String> {
+pub async fn get_jira_user_id(jira_api: &JiraAPIShared, email: &String) -> Result<String> {
     let mut page = 0;
     let mut result = String::new();
 
@@ -58,7 +54,7 @@ pub async fn get_jira_user_id(jira_api: &JiraAPIShared, reporter_email: &String)
 
         let reporter = users
             .iter()
-            .find(|u| u.email_address.clone().unwrap_or_default().to_lowercase() == *reporter_email.to_lowercase());
+            .find(|u| u.email_address.clone().unwrap_or_default().to_lowercase() == *email.to_lowercase());
 
         if reporter.is_some() {
             result = reporter.unwrap().account_id.clone();

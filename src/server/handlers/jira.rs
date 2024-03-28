@@ -5,6 +5,7 @@ use axum::http::{header::HeaderMap, HeaderName, StatusCode};
 use axum::response::Result as ApiResult;
 use axum::Extension;
 use hmac::{Hmac, Mac};
+use regex::Regex;
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::Sha256;
@@ -13,6 +14,7 @@ type HmacSha256 = Hmac<Sha256>;
 use crate::jira_api::comment::JiraComment;
 use crate::jira_api::issue::Issue;
 use crate::jira_api::model::JiraAPIShared;
+use crate::jira_api::user::JiraUser;
 use crate::ms_graph_api::model::MSGraphAPIShared;
 use crate::server::error::{Context as ApiContext, Error as ApiError};
 
@@ -133,16 +135,30 @@ fn get_signature_from_headers(headers: HeaderMap) -> Result<Signature> {
 async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSGraphAPIShared) -> Result<()> {
     let request = serde_json::from_slice::<CommentRequest>(&payload)
         .context("Failed to deserialize payload")?;
-    let author_email = request.comment.update_author.get_email(jira_api).await.context("Failed to get author email")?.unwrap_or_default();
+    let author = JiraUser::find_by_id(&request.comment.update_author.account_id, jira_api).await.context("Failed to get author")?;
 
-    if author_email == jira_api.config.user {
-        return Ok(());
+    if let Some(author_email) = author.email_address {
+        if author_email.to_lowercase() == jira_api.config.user.to_lowercase() {
+            return Ok(());
+        }
     }
 
     let issue = Issue::get_issue(jira_api, &request.issue.id).await.context("Failed to get comment issue by id")?;
 
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
-        let reply_body = markdown_to_html_parser::parse_markdown(request.comment.body.as_str());
+        let mut text = request.comment.body;
+
+        let re = Regex::new(r"\[~accountid:([a-f0-9]+)\]").expect("Failed to compile regex");
+
+        for cap in re.captures_iter(&text.clone()) {
+            if let Ok(user) = JiraUser::find_by_id(&cap[1].to_string(), jira_api).await {
+                if let Some(username) = user.display_name.or(user.email_address) {
+                    text = text.replace(format!("[~accountid:{}]", cap[1].to_string()).as_str(), format!("@{}", username.as_str()).as_str());
+                }
+            }
+        }
+        
+        let reply_body = markdown_to_html_parser::parse_markdown(&text);
         let comment = JiraComment::get(jira_api, &issue.get_id(), &request.comment.id).await?;
 
         if let Some(reply_id) = comment.get_reply_id() {
