@@ -103,14 +103,22 @@ pub async fn handler(
                                 },
                         };
 
+                    log_to_file(format!("Log issue (exists: {})", issue_exists).as_str(), issue.get_key().as_str());
+
                     if !issue_exists {
                         let url = format!("{}/browse/{}", jira_api.config.base_url, issue.get_key());
 
-                        graph_api
+                        match graph_api
                             .reply_to_issue(&message_id_unwrapped, &format!("<a href=\"{}\">{}</a>", url, url))
                             .await
                             .map_err(Error::c500)
-                            .context("Failed to send reply for teams topic")?;
+                            .context("Failed to send reply for teams topic") {
+                                Ok(_) => (),
+                                Err(e) => {
+                                        log_to_file("Reply with issue ID to MS Teams", e.to_string().as_str());
+                                        return Err(e.into());
+                                    }
+                            }
                     }
                 }
             }
