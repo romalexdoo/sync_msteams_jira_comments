@@ -1,4 +1,4 @@
-use super::headers::{ security_headers, static_cache_control };
+use super::headers::{ add_security_headers, static_cache_control };
 use crate::cfg::Config;
 use crate::jira_api::model::JiraAPIShared;
 use crate::server::handlers::{jira, teams, teams_lifecycle, ms_oauth};
@@ -8,6 +8,7 @@ use axum::{
     Extension,
     Router,
     routing::post,
+    middleware,
 };
 use axum_server::Handle;
 use std::sync::Arc;
@@ -41,9 +42,7 @@ impl Server {
             .route("/teams_lifecycle", post(teams_lifecycle::handler))
             .route("/ms_oauth", post(ms_oauth::handler))
             // Injects default response headers (https://owasp.org/www-project-secure-headers).
-            .layer(Extension(security_headers()))
-            // // Injects API settings.
-            // .layer(Extension(cfg.clone()))
+            .layer(middleware::from_fn(add_security_headers))
             // Injects Jira API.
             .layer(Extension(jira_api))
             // Injects MS Graph API.

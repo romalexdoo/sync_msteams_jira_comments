@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
 
-use crate::ms_graph_api::{message::TeamsAttachment, model::MSGraphAPIShared};
+use crate::{ms_graph_api::{message::TeamsAttachment, model::MSGraphAPIShared}, server::handlers::helpers::log_to_file};
 
 use super::{
     attachment::{add_attachments_urls_to_description, find_old_attached_images, replace_attachments, replace_images_in_description, JiraAttachment}, 
@@ -131,14 +131,17 @@ impl Issue {
             fields.insert("reporter".to_string(), reporter["reporter"].clone());
         }
     
-        let mut issue = Issue::find(jira_api, message_url, graph_api, message_id).await?;
-        let issue_exists = issue.is_some();
+        
+        let mut maybe_issue = Issue::find(jira_api, message_url, graph_api, message_id).await?;
+        let issue_exists = maybe_issue.is_some();
     
         if !issue_exists {
             #[derive(Deserialize)]
             struct CreateIssueResponse {
                 id: String,
             }
+
+            log_to_file("Teams", "Try to create issue").await;
             
             let result = jira_api.client
                         .post(format!("{}/rest/api/2/issue", jira_api.config.base_url))
@@ -152,16 +155,26 @@ impl Issue {
                         .json::<CreateIssueResponse>()
                         .await
                         .context("Parse create issue response")?;
-            issue = Issue::get_issue(jira_api, &result.id).await.ok();
+            
+            log_to_file("Teams", "New issue created").await;
+
+            maybe_issue = Issue::get_issue(jira_api, &result.id).await.ok();
+
+            log_to_file("Teams", "Got recently created issue").await;
         } else {
-            let issue = issue.as_mut().unwrap();
+            let issue = maybe_issue.as_mut().unwrap();
             issue.update(jira_api, &payload).await?;
         }
     
-        let issue = issue.ok_or(anyhow!("Failed to get created issue"))?;
+        let issue = maybe_issue.ok_or(anyhow!("Failed to get created issue"))?;
+
+        log_to_file("Teams", "Unwrapped issue").await;
     
         let old_image_names = find_old_attached_images(&issue.get_description().unwrap_or_default());
+        log_to_file("Teams", format!("Got old images: {:?}", old_image_names).as_str()).await;
+
         replace_attachments(jira_api, &issue, &old_image_names, &images).await.context("Failed to replace attachments")?;
+        log_to_file("Teams", "Replaced attachments").await;
     
         Ok((issue, issue_exists))
     }

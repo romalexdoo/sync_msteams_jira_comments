@@ -1,8 +1,11 @@
+use axum::extract::Request;
 use axum::http::header::HeaderMap;
 use axum::http::header::HeaderValue;
 use axum::http::header::CACHE_CONTROL;
 use axum::http::header::REFERRER_POLICY;
 use axum::http::header::X_CONTENT_TYPE_OPTIONS;
+use axum::middleware::Next;
+use axum::response::Response;
 
 const CROSS_ORIGIN_EMBEDDER_POLICY: &str = "cross-origin-embedder-policy";
 const CROSS_ORIGIN_EMBEDDER_POLICY_DEFAULT: &str = "require-corp";
@@ -21,8 +24,27 @@ const X_CONTENT_TYPE_OPTIONS_DEFAULT: &str = "nosniff";
 const X_PERMITTED_CROSS_DOMAIN_POLICIES: &str = "x-permitted-cross-domain-policies";
 const X_PERMITTED_CROSS_DOMAIN_POLICIES_DEFAULT: &str = "none";
 
-pub fn security_headers() -> HeaderMap {
+
+pub fn static_cache_control() -> HeaderMap {
     let mut h = HeaderMap::new();
+
+    h.insert(
+        CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=31536000, immutable"),
+    );
+
+    h
+}
+
+pub async fn add_security_headers(
+    req: Request,
+    next: Next,
+) -> Response {
+    let response = next.run(req).await;
+    let (mut parts, body) = response.into_parts();
+    
+    let h = &mut parts.headers;
+    
     h.reserve(12);
     h.insert(
         HTTP_STRICT_TRANSPORT_SECURITY,
@@ -44,16 +66,6 @@ pub fn security_headers() -> HeaderMap {
     h.insert(CROSS_ORIGIN_OPENER_POLICY, HeaderValue::from_static(SAME_ORIGIN));
     h.insert(CROSS_ORIGIN_RESOURCE_POLICY, HeaderValue::from_static(SAME_ORIGIN));
     h.insert(PERMISSIONS_POLICY, HeaderValue::from_static(PERMISSIONS_POLICY_DEFAULT));
-    h
-}
 
-pub fn static_cache_control() -> HeaderMap {
-    let mut h = HeaderMap::new();
-
-    h.insert(
-        CACHE_CONTROL,
-        HeaderValue::from_static("public, max-age=31536000, immutable"),
-    );
-
-    h
+    Response::from_parts(parts, body)
 }

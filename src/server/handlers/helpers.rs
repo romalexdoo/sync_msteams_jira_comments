@@ -1,6 +1,7 @@
 use regex::Regex;
 use serde::Deserialize;
-use std::{fs::OpenOptions, io::Write};
+use tokio::{fs::OpenOptions, io::AsyncWriteExt};
+
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -8,13 +9,14 @@ pub struct ValidationTokenQuery {
     pub validation_token: String,
 }
 
-pub fn log_to_file(handler: &str, payload: &str) {
+pub async fn log_to_file(handler: &str, payload: &str) {
     if let Ok(mut file) = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("test.txt") {
+        .open("test.txt")
+        .await {
             let data = format!("{}\t{}\t{}\n", chrono::Local::now().format("%d.%m.%Y %H:%M:%S").to_string(), handler, payload);
-            let _ = file.write_all(data.as_bytes());
+            let _ = file.write_all(data.as_bytes()).await;
     };
 }
 
