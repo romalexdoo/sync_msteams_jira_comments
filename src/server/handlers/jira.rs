@@ -75,19 +75,17 @@ pub async fn handler(
         .map_err(ApiError::c500)
         .context("Failed to deserialize payload")?;
 
-    let webhook_event = &json_payload
-        .get("webhookEvent")
-        .and_then(|t| t.as_str())
-        .unwrap_or_default();
+    let webhook_event = format!("{}",
+            &json_payload
+                .get("webhookEvent")
+                .and_then(|t| t.as_str())
+                .unwrap_or_default()
+                .to_string()
+        );
 
-    match *webhook_event {
-        "comment_created" | "comment_updated" => { 
-                parse_comment(payload, &jira_api, &graph_api).await.map_err(ApiError::c500).context("Failed to parse comment")?; 
-            },
-        _ => { 
-                parse_issue(payload, &graph_api).await.map_err(ApiError::c500).context("Failed to parse issue")?;
-            },
-    }
+    tokio::task::spawn(async move { 
+        handle_jira_request(webhook_event, payload, &jira_api, &graph_api).await 
+    });
 
     Ok(StatusCode::OK)
 }
@@ -198,6 +196,19 @@ async fn parse_issue(payload: Bytes, graph_api: &MSGraphAPIShared) -> Result<()>
                     .context("Failed to send notification to the channel")?;
             }
         }
+    }
+
+    Ok(())
+}
+
+async fn handle_jira_request(webhook_event: String, payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSGraphAPIShared) -> anyhow::Result<()> {
+    match webhook_event.as_str() {
+        "comment_created" | "comment_updated" => { 
+                parse_comment(payload, jira_api, graph_api).await?; 
+            },
+        _ => { 
+                parse_issue(payload, graph_api).await?;
+            },
     }
 
     Ok(())
