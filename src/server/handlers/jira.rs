@@ -145,12 +145,14 @@ async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSG
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
         let mut text = request.comment.body;
 
-        let re = Regex::new(r"\[~accountid:(\d+):([0-9a-fA-F\-]{36})\]").expect("Failed to compile regex");
+        let re = Regex::new(r"\[~accountid:([^\]]+)\]").expect("Failed to compile regex");
 
         for cap in re.captures_iter(&text.clone()) {
-            if let Ok(user) = jira_api.find_user_by_id(&cap[2].to_string()).await {
+            let account_id = &cap[1].to_string();
+            if let Ok(user) = jira_api.find_user_by_id(account_id).await {
                 if let Some(username) = user.display_name.or(user.email_address) {
-                    text = text.replace(format!("[~accountid:{}:{}]", cap[1].to_string(), cap[2].to_string()).as_str(), format!("@{}", username.as_str()).as_str());
+                    let full_match = cap.get(0).unwrap().as_str();
+                    text = text.replace(full_match, format!("@{}", username.as_str()).as_str());
                 }
             }
         }
