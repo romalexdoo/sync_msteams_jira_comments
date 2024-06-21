@@ -152,7 +152,7 @@ async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSG
             if let Ok(user) = jira_api.find_user_by_id(account_id).await {
                 if let Some(username) = user.display_name.or(user.email_address) {
                     let full_match = cap.get(0).unwrap().as_str();
-                    text = text.replace(full_match, format!("@{}", username.as_str()).as_str());
+                    text = text.replace(full_match, format!("{}", username.as_str()).as_str());
                 }
             }
         }
