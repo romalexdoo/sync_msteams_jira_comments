@@ -1,7 +1,7 @@
-pub mod cfg;
-pub mod delegated_token;
-pub mod image;
-pub mod message;
+pub(crate) mod cfg;
+pub(crate) mod delegated_token;
+pub(crate) mod image;
+pub(crate) mod message;
 pub mod model;
-pub mod subscription;
-pub mod token;
+pub(crate) mod subscription;
+pub(crate) mod token;

@@ -14,41 +14,40 @@ type HmacSha256 = Hmac<Sha256>;
 use crate::jira_api::comment::JiraComment;
 use crate::jira_api::issue::Issue;
 use crate::jira_api::model::JiraAPIShared;
-use crate::jira_api::user::JiraUser;
 use crate::ms_graph_api::model::MSGraphAPIShared;
 use crate::server::error::{Context as ApiContext, Error as ApiError};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct IssueRequest {
-    pub issue: Issue,
-    pub changelog: ChangeLog,
+pub(crate) struct IssueRequest {
+    pub(crate) issue: Issue,
+    pub(crate) changelog: ChangeLog,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommentRequest {
-    pub comment: JiraComment,
-    pub issue: IssueId,
+pub(crate) struct CommentRequest {
+    pub(crate) comment: JiraComment,
+    pub(crate) issue: IssueId,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct IssueId {
-    pub id: String,
+pub(crate) struct IssueId {
+    pub(crate) id: String,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChangeLog {
-    pub items: Vec<ChangeLogItem>,
+pub(crate) struct ChangeLog {
+    pub(crate) items: Vec<ChangeLogItem>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChangeLogItem {
-    pub field: String,
-    pub to_string: String,
+pub(crate) struct ChangeLogItem {
+    pub(crate) field: String,
+    // pub(crate) to_string: String,
 }
 
 #[derive(Debug)]
@@ -57,7 +56,7 @@ struct Signature {
     value: String,
 }
 
-pub async fn handler(
+pub(crate) async fn handler(
     Extension(jira_api): Extension<JiraAPIShared>,
     State(graph_api): State<MSGraphAPIShared>,
     headers: HeaderMap,
@@ -133,7 +132,7 @@ fn get_signature_from_headers(headers: HeaderMap) -> Result<Signature> {
 async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSGraphAPIShared) -> Result<()> {
     let request = serde_json::from_slice::<CommentRequest>(&payload)
         .context("Failed to deserialize payload")?;
-    let author = JiraUser::find_by_id(&request.comment.update_author.account_id, jira_api).await.context("Failed to get author")?;
+    let author = jira_api.find_user_by_id(&request.comment.update_author.account_id).await.context("Failed to get author")?;
 
     if let Some(author_email) = author.email_address {
         if author_email.to_lowercase() == jira_api.config.user.to_lowercase() {
@@ -146,12 +145,12 @@ async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSG
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
         let mut text = request.comment.body;
 
-        let re = Regex::new(r"\[~accountid:([a-f0-9]+)\]").expect("Failed to compile regex");
+        let re = Regex::new(r"\[~accountid:(\d+):([0-9a-fA-F\-]{36})\]").expect("Failed to compile regex");
 
         for cap in re.captures_iter(&text.clone()) {
-            if let Ok(user) = JiraUser::find_by_id(&cap[1].to_string(), jira_api).await {
+            if let Ok(user) = jira_api.find_user_by_id(&cap[2].to_string()).await {
                 if let Some(username) = user.display_name.or(user.email_address) {
-                    text = text.replace(format!("[~accountid:{}]", cap[1].to_string()).as_str(), format!("@{}", username.as_str()).as_str());
+                    text = text.replace(format!("[~accountid:{}:{}]", cap[1].to_string(), cap[2].to_string()).as_str(), format!("@{}", username.as_str()).as_str());
                 }
             }
         }

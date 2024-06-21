@@ -7,12 +7,12 @@ use serde::Deserialize;
 use super::cfg::Config;
 
 pub struct ApplicationToken {
-    pub value: String,
-    pub expires_at: Instant,
+    pub(crate) value: String,
+    pub(crate) expires_at: Instant,
 }
 
 impl ApplicationToken {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self { value: String::new(), expires_at: Instant::now() }
     }
 

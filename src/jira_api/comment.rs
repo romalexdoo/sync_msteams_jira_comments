@@ -7,7 +7,7 @@ use crate::ms_graph_api::{message::TeamsAttachment, model::MSGraphAPIShared};
 use super::{
     attachment::{add_attachments_urls_to_description, find_old_attached_images, replace_attachments, replace_images_in_description}, 
     issue::Issue, 
-    model::JiraAPIShared, user::{get_jira_user_id, JiraUser},
+    model::{JiraAPIShared, JiraUser},
 };
 
 const PROPERTY_KEY: &str = "teams_id";
@@ -15,26 +15,26 @@ const PROPERTY_KEY: &str = "teams_id";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct JiraComment {
-    pub id: String,
-    pub body: String,
-    pub update_author: JiraUser,
-    pub properties: Option<Vec<JiraCommentProperty>>,
+pub(crate) struct JiraComment {
+    pub(crate) id: String,
+    pub(crate) body: String,
+    pub(crate) update_author: JiraUser,
+    pub(crate) properties: Option<Vec<JiraCommentProperty>>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct JiraCommentProperty {
-    pub key: String,
-    pub value: Option<JiraCommentPropertyValue>,
+pub(crate) struct JiraCommentProperty {
+    pub(crate) key: String,
+    pub(crate) value: Option<JiraCommentPropertyValue>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct JiraCommentPropertyValue {
-    pub teams_id: String,
+pub(crate) struct JiraCommentPropertyValue {
+    pub(crate) teams_id: String,
 }
 
 impl JiraComment {
-    pub async fn create_or_update (
+    pub(crate) async fn create_or_update (
         jira_api: &JiraAPIShared,
         description: &String, 
         author_email: &String, 
@@ -53,11 +53,11 @@ impl JiraComment {
 
         let images = replace_images_in_description(&mut description_v2, graph_api_token).await?;
 
-        let mut author_id = get_jira_user_id(jira_api, author_email).await.unwrap_or_default();
-        if author_id.len() == 0 {
-            author_id = author_email.clone();
-        }
-
+        let author_id = jira_api
+            .get_jira_user_by_email(author_email)
+            .await?
+            .map_or(author_email.clone(), |u| u.account_id.clone());
+        
         description_v2 = format!("On behalf of [~accountid:{}]:\n\n{}", author_id, description_v2);
     
 
@@ -109,7 +109,7 @@ impl JiraComment {
         Ok(comment)
     }
 
-    pub async fn find(jira_api: &JiraAPIShared, issue_id: &String, reply_id: &String) -> Result<Option<Self>> {
+    pub(crate) async fn find(jira_api: &JiraAPIShared, issue_id: &String, reply_id: &String) -> Result<Option<Self>> {
 
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -151,7 +151,7 @@ impl JiraComment {
         Ok(result)
     }
 
-    pub async fn update(&self, jira_api: &JiraAPIShared, issue_id: &String, payload: &Value) -> Result<()> {
+    pub(crate) async fn update(&self, jira_api: &JiraAPIShared, issue_id: &String, payload: &Value) -> Result<()> {
         jira_api.client
             .put(format!("{}/rest/api/2/issue/{}/comment/{}", jira_api.config.base_url, issue_id, self.id))
             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
@@ -165,7 +165,7 @@ impl JiraComment {
         Ok(())
     }
 
-    pub fn get_reply_id(&self) -> Option<String> {
+    pub(crate) fn get_reply_id(&self) -> Option<String> {
         Some(
             self
                 .properties
@@ -179,7 +179,7 @@ impl JiraComment {
             )
     }
 
-    pub async fn add_reply_id(&self, jira_api: &JiraAPIShared, reply_id: &String) -> Result<()> {
+    pub(crate) async fn add_reply_id(&self, jira_api: &JiraAPIShared, reply_id: &String) -> Result<()> {
         let payload = json!({
             "teams_id": reply_id
         });
@@ -197,7 +197,7 @@ impl JiraComment {
         Ok(())
     }
 
-    pub async fn get(jira_api: &JiraAPIShared, issue_id: &String, comment_id: &String) -> Result<Self> {
+    pub(crate) async fn get(jira_api: &JiraAPIShared, issue_id: &String, comment_id: &String) -> Result<Self> {
         Ok(
             jira_api.client
                 .get(format!("{}/rest/api/2/issue/{}/comment/{}", jira_api.config.base_url, issue_id, comment_id))

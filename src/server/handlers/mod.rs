@@ -1,5 +1,5 @@
-pub mod helpers;
-pub mod jira;
-pub mod ms_oauth;
-pub mod teams;
-pub mod teams_lifecycle;
+pub(crate) mod helpers;
+pub(crate) mod jira;
+pub(crate) mod ms_oauth;
+pub(crate) mod teams;
+pub(crate) mod teams_lifecycle;

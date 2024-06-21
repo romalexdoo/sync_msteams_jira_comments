@@ -25,7 +25,7 @@ const X_PERMITTED_CROSS_DOMAIN_POLICIES: &str = "x-permitted-cross-domain-polici
 const X_PERMITTED_CROSS_DOMAIN_POLICIES_DEFAULT: &str = "none";
 
 
-pub fn static_cache_control() -> HeaderMap {
+pub(crate) fn static_cache_control() -> HeaderMap {
     let mut h = HeaderMap::new();
 
     h.insert(
@@ -36,7 +36,7 @@ pub fn static_cache_control() -> HeaderMap {
     h
 }
 
-pub async fn add_security_headers(
+pub(crate) async fn add_security_headers(
     req: Request,
     next: Next,
 ) -> Response {

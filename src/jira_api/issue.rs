@@ -2,17 +2,16 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
 
-use crate::{ms_graph_api::{message::TeamsAttachment, model::MSGraphAPIShared}, server::handlers::helpers::log_to_file};
+use crate::ms_graph_api::{message::TeamsAttachment, model::MSGraphAPIShared};
 
 use super::{
     attachment::{add_attachments_urls_to_description, find_old_attached_images, replace_attachments, replace_images_in_description, JiraAttachment}, 
-    // comment::JiraComment, 
-    model::JiraAPIShared, user::get_jira_user_id,
+    model::JiraAPIShared,
 };
 
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct Issue {
+pub(crate) struct Issue {
     id: String,
     key: String,
     // #[serde(rename = "self")]
@@ -42,39 +41,39 @@ struct IssueStatus {
 }
 
 impl Issue {
-    pub fn get_id(&self) -> String {
+    pub(crate) fn get_id(&self) -> String {
         self.id.clone()
     }
     
-    pub fn get_key(&self) -> String {
+    pub(crate) fn get_key(&self) -> String {
         self.key.clone()
     }
     
-    pub fn get_attachments(&self) -> Option<Vec<JiraAttachment>> {
+    pub(crate) fn get_attachments(&self) -> Option<Vec<JiraAttachment>> {
         self.fields
             .as_ref()
             .map(|f| f.attachment.clone())
     }
     
-    pub fn get_description(&self) -> Option<String> {
+    pub(crate) fn get_description(&self) -> Option<String> {
         self.fields
             .as_ref()
             .map(|f| f.description.clone())
     }
 
-    pub fn get_status(&self) -> Option<String> {
+    pub(crate) fn get_status(&self) -> Option<String> {
         self.fields
             .as_ref()
             .map(|f| f.status.name.clone())
     }
 
-    pub fn get_teams_link(&self) -> Option<String> {
+    pub(crate) fn get_teams_link(&self) -> Option<String> {
         self.fields
             .as_ref()
             .and_then(|f| f.teams_link.clone())
     }
     
-    pub async fn create_or_update (
+    pub(crate) async fn create_or_update (
         jira_api: &JiraAPIShared,
         summary: &String, 
         description: &String, 
@@ -119,7 +118,9 @@ impl Issue {
 
         fields.insert(jira_api.config.msteams_link_field_name.clone(), teams_link["teams_link"].clone());
 
-        let reporter_id = get_jira_user_id(jira_api, reporter_email).await.unwrap_or_default();
+        let reporter_id = jira_api
+            .get_jira_user_by_email(reporter_email).await?.map(|u| u.account_id)
+            .unwrap_or_default();
     
         if !reporter_id.is_empty() {
             let reporter = json!({
@@ -141,8 +142,6 @@ impl Issue {
                 id: String,
             }
 
-            log_to_file("Teams", "Try to create issue").await;
-            
             let result = jira_api.client
                         .post(format!("{}/rest/api/2/issue", jira_api.config.base_url))
                         .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
@@ -156,11 +155,7 @@ impl Issue {
                         .await
                         .context("Parse create issue response")?;
             
-            log_to_file("Teams", "New issue created").await;
-
             maybe_issue = Issue::get_issue(jira_api, &result.id).await.ok();
-
-            log_to_file("Teams", "Got recently created issue").await;
         } else {
             let issue = maybe_issue.as_mut().unwrap();
             issue.update(jira_api, &payload).await?;
@@ -168,18 +163,14 @@ impl Issue {
     
         let issue = maybe_issue.ok_or(anyhow!("Failed to get created issue"))?;
 
-        log_to_file("Teams", "Unwrapped issue").await;
-    
         let old_image_names = find_old_attached_images(&issue.get_description().unwrap_or_default());
-        log_to_file("Teams", format!("Got old images: {:?}", old_image_names).as_str()).await;
 
         replace_attachments(jira_api, &issue, &old_image_names, &images).await.context("Failed to replace attachments")?;
-        log_to_file("Teams", "Replaced attachments").await;
     
         Ok((issue, issue_exists))
     }
 
-    pub async fn find(
+    pub(crate) async fn find(
         jira_api: &JiraAPIShared, 
         teams_url: &String,
         graph_api: &MSGraphAPIShared,
@@ -221,7 +212,7 @@ impl Issue {
         Ok(Some(issue))
     }
 
-    pub async fn get_issue(
+    pub(crate) async fn get_issue(
         jira_api: &JiraAPIShared, 
         issue_id: &String,
     ) -> Result<Self> {
@@ -240,7 +231,7 @@ impl Issue {
         Ok(issue)
     }
 
-    pub async fn update(&self, jira_api: &JiraAPIShared, payload: &Value) -> Result<()> {
+    pub(crate) async fn update(&self, jira_api: &JiraAPIShared, payload: &Value) -> Result<()> {
         jira_api.client
             .put(format!("{}/rest/api/2/issue/{}", jira_api.config.base_url, self.id))
             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
@@ -256,7 +247,7 @@ impl Issue {
 }
 
 impl IssueStatus {
-    pub fn is_final(&self) -> bool {
+    pub(crate) fn is_final(&self) -> bool {
         self.name.to_lowercase() == "Done".to_lowercase() || self.name.to_lowercase() == "Rejected".to_lowercase()
     }
 }

@@ -17,7 +17,7 @@ pub async fn os_signal_or_completion_of(future: impl Future<Output = Result<()>>
     }
 }
 
-pub fn get_reqwest_client() -> Result<Client> {
+pub(crate) fn get_reqwest_client() -> Result<Client> {
     Ok(
         reqwest::ClientBuilder::new()
             .connect_timeout(Duration::from_secs(15))

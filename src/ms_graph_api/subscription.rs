@@ -40,7 +40,7 @@ struct ActiveSubsciptionResponse {
 }
 
 impl Subscription {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self { subscription_id: Uuid::nil(), subscription_secret: Uuid::nil() }
     }
 
@@ -100,7 +100,7 @@ impl Subscription {
         Ok(())
     }
 
-    pub async fn renew(&mut self, client: &Client, access_token: &String, subsciption_id: &String) -> Result<()> {
+    pub(crate) async fn renew(&mut self, client: &Client, access_token: &String, subsciption_id: &String) -> Result<()> {
         let req = RenewSubsciptionRequest {
             expiration_date_time: Utc::now() + chrono::Duration::try_hours(3).unwrap(),
         };
@@ -118,7 +118,7 @@ impl Subscription {
         Ok(())
     }
 
-    pub fn check_client_secret(&self, secret: &String) -> Result<()> {
+    pub(crate) fn check_client_secret(&self, secret: &String) -> Result<()> {
         let secret_uuid = Uuid::try_parse(secret.as_str())?;
         ensure!(secret_uuid == self.subscription_secret, "Incorrect secret");
         Ok(())

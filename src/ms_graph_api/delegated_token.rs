@@ -6,7 +6,7 @@ use tokio::time::{Duration, Instant};
 use super::cfg::Config;
 
 #[derive(Deserialize)]
-pub struct GrantedToken {
+pub(crate) struct GrantedToken {
     access_token: String,
     refresh_token: String,
     expires_in: u64,
@@ -19,11 +19,11 @@ fn default_instant() -> Instant {
 }
 
 impl GrantedToken {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self { access_token: String::new(), refresh_token: String::new(), expires_in: 0, expires_at: default_instant() }
     }
     
-    pub async fn set_first_time(&mut self, client: &Client, config: &Config, code: String) -> Result<()> {
+    pub(crate) async fn set_first_time(&mut self, client: &Client, config: &Config, code: String) -> Result<()> {
         let form = [
             ("client_id", config.client_id.as_str()),
             ("scope", "ChannelMessage.Send ChannelMessage.ReadWrite"),
@@ -60,13 +60,13 @@ impl GrantedToken {
         Ok((token.access_token, token.expires_in))
     }
 
-    pub fn get(&self) -> Result<String> {
+    pub(crate) fn get(&self) -> Result<String> {
         ensure!(!self.access_token.is_empty(), "Token value is empty");
         ensure!(Instant::now() < self.expires_at, "Token expired");
         Ok(self.access_token.clone())
     }
 
-    pub async fn refresh_and_get_expiration_time(&mut self, client: &Client, config: &Config) -> Result<u64> {
+    pub(crate) async fn refresh_and_get_expiration_time(&mut self, client: &Client, config: &Config) -> Result<u64> {
         let refresh_token = self.refresh_token.clone();
         let form = [
             ("client_id", config.client_id.as_str()),

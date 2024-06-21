@@ -8,12 +8,12 @@ use crate::ms_graph_api::model::MSGraphAPIShared;
 
 
 #[derive(Debug, Deserialize)]
-pub struct OAuthRequest {
-    pub code: String,
-    pub state: String,
+pub(crate) struct OAuthRequest {
+    pub(crate) code: String,
+    pub(crate) state: String,
 }
 
-pub async fn handler(
+pub(crate) async fn handler(
     State(graph_api): State<MSGraphAPIShared>,
     Form(data): Form<OAuthRequest>,
 ) -> Html<String> {

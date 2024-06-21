@@ -7,14 +7,14 @@ use uuid::Uuid;
 use crate::utils::get_reqwest_client;
 
 #[derive(Debug)]
-pub struct GraphApiImage {
-    pub name: String,
-    pub data: Vec<u8>,
-    pub mime_str: String,
+pub(crate) struct GraphApiImage {
+    pub(crate) name: String,
+    pub(crate) data: Vec<u8>,
+    pub(crate) mime_str: String,
 }
 
 impl GraphApiImage {
-    pub async fn get(access_token: &String, url: &String) -> Result<Self> {
+    pub(crate) async fn get(access_token: &String, url: &String) -> Result<Self> {
         let client = get_reqwest_client()?;
 
         let response = client

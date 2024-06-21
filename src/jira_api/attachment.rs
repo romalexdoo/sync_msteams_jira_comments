@@ -12,12 +12,12 @@ use super::{issue::Issue, model::JiraAPIShared};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct JiraAttachment {
-    pub id: String,
-    pub filename: String,
+pub(crate) struct JiraAttachment {
+    pub(crate) id: String,
+    pub(crate) filename: String,
 }
 
-pub fn add_attachments_urls_to_description(description: &mut String, attachments: &Vec<TeamsAttachment>) -> bool {
+pub(crate) fn add_attachments_urls_to_description(description: &mut String, attachments: &Vec<TeamsAttachment>) -> bool {
     let mut updated = false;
 
     for attachment in attachments {
@@ -30,7 +30,7 @@ pub fn add_attachments_urls_to_description(description: &mut String, attachments
     updated
 }
 
-pub async fn replace_images_in_description(
+pub(crate) async fn replace_images_in_description(
     description: &mut String, 
     graph_api_token: &String, 
 ) -> Result<Vec<GraphApiImage>> {
@@ -56,7 +56,7 @@ pub async fn replace_images_in_description(
     Ok(result)
 }
 
-pub async fn replace_attachments(
+pub(crate) async fn replace_attachments(
     jira_api: &JiraAPIShared, 
     issue: &Issue, 
     old_image_names: &Vec<String>, 
@@ -134,7 +134,7 @@ async fn delete_attachment(jira_api: &JiraAPIShared, attachment_id: &String) -> 
     Ok(())
 }
 
-pub fn find_old_attached_images(description: &String) -> Vec<String> {
+pub(crate) fn find_old_attached_images(description: &String) -> Vec<String> {
     let pattern_str = format!("\n\n!+([^!]+)!\n\n");
     let pattern = Regex::new(&pattern_str).unwrap();
     

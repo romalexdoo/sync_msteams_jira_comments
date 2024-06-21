@@ -16,20 +16,20 @@ use super::helpers;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Request {
-    pub value: Vec<RequestValue>,
+pub(crate) struct Request {
+    pub(crate) value: Vec<RequestValue>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RequestValue {
-    pub lifecycle_event: String,
-    pub client_state: String,
-    pub subscription_id: String,
+pub(crate) struct RequestValue {
+    pub(crate) lifecycle_event: String,
+    pub(crate) client_state: String,
+    pub(crate) subscription_id: String,
 }
 
 
-pub async fn handler(
+pub(crate) async fn handler(
     query: Option<Query<helpers::ValidationTokenQuery>>, 
     State(graph_api): State<MSGraphAPIShared>,
     req: Option<Json<Request>>

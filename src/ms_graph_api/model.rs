@@ -16,13 +16,14 @@ use super::delegated_token::GrantedToken;
 use super::subscription::Subscription;
 use super::token::ApplicationToken;
 
-pub type MSGraphAPIShared = Arc<MSGraphAPI>;
+pub(crate) type MSGraphAPIShared = Arc<MSGraphAPI>;
 
 pub struct MSGraphAPI {
     pub state: Mutex<MSGraphAPIState>,
     pub config: Config,
     pub client: Client,
-    pub granted_token: RwLock<GrantedToken>,
+    pub(crate) granted_token: RwLock<GrantedToken>,
+    pub(crate) users: RwLock<Vec<MsUser>>,
 }
 
 pub struct MSGraphAPIState {
@@ -32,8 +33,9 @@ pub struct MSGraphAPIState {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct UserResponse {
-    mail: String,
+pub(crate) struct MsUser {
+    pub(crate) id: Uuid,
+    pub(crate) mail: String,
 }
 
 impl MSGraphAPIState {
@@ -52,27 +54,48 @@ impl MSGraphAPI {
             state: Mutex::new(MSGraphAPIState::new()),
             client: get_reqwest_client()?,
             granted_token: RwLock::new(GrantedToken::new()),
+            users: RwLock::new(Vec::new()),
         };
         Ok(graph_api)
     }
 
-    pub async fn get_user_email(&self, access_token: &String, user_id: Uuid) -> Result<String> {
-        let user = self.client
-            .get(format!("https://graph.microsoft.com/v1.0/users/{}", user_id.to_string()))
-            .bearer_auth(access_token)
-            .send()
+    pub(crate) async fn get_user_email(&self, access_token: &String, user_id: Uuid) -> Result<String> {
+        let user_mail = self
+            .users
+            .read()
             .await
-            .context("Failed to send get user mail request")?
-            .error_for_status()
-            .context("Get user mail request bad status")?
-            .json::<UserResponse>()
-            .await
-            .context("Parse get user mail response")?;
+            .iter()
+            .find(|u| u.id == user_id)
+            .map(|u| u.mail.clone());
+        
+        if user_mail.is_none() {
+            let new_user = self.client
+                .get(format!("https://graph.microsoft.com/v1.0/users/{}", user_id.to_string()))
+                .bearer_auth(access_token)
+                .send()
+                .await
+                .context("Failed to send get user mail request")?
+                .error_for_status()
+                .context("Get user mail request bad status")?
+                .json::<MsUser>()
+                .await
+                .context("Parse get user mail response")?;
 
-        Ok(user.mail)
+            let new_user_mail = new_user.mail.clone();
+            
+            self
+                .users
+                .write()
+                .await
+                .push(new_user);
+
+            Ok(new_user_mail)
+        } else {
+            Ok(user_mail.unwrap_or_default())
+        }
     }
 
-    pub async fn set_delegated_token(&self, code: String) -> Result<()> {
+    pub(crate) async fn set_delegated_token(&self, code: String) -> Result<()> {
         let mut tx = self.granted_token.write().await;
         tx.set_first_time(&self.client, &self.config, code).await
     }
@@ -101,7 +124,7 @@ impl MSGraphAPI {
         }
     }
 
-    pub async fn reply_to_issue(&self, message_id: &String, reply_body: &String) -> Result<MsGraphMessage> {
+    pub(crate) async fn reply_to_issue(&self, message_id: &String, reply_body: &String) -> Result<MsGraphMessage> {
         let token = self.granted_token.read().await.get()?;
 
         let payload = json!(
@@ -129,7 +152,7 @@ impl MSGraphAPI {
         Ok(response)
     }
 
-    pub async fn edit_reply(&self, message_id: &String, reply_id: &String, reply_body: &String) -> Result<()> {
+    pub(crate) async fn edit_reply(&self, message_id: &String, reply_id: &String, reply_body: &String) -> Result<()> {
         let token = self.granted_token.read().await.get()?;
 
         let payload = json!(
