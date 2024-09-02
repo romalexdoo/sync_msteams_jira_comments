@@ -39,7 +39,7 @@ pub(crate) async fn handler(
     if let Some(Json(request)) = req {
         if let Err(e) = parse_handler(graph_api, request).await {
             log_to_file("teams_lifecycle", &e.to_string()).await;
-            return Error::c500(e);
+            return Err(Error::c500(e));
         }
     };
 

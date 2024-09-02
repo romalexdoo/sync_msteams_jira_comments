@@ -68,7 +68,7 @@ pub(crate) async fn handler(
         Ok(()) => Ok(StatusCode::OK),
         Err(e) => {
             log_to_file("jira", &e.to_string()).await;
-            return ApiError::c500(e);
+            return Err(ApiError::c500(e));
         }
     }
 }
