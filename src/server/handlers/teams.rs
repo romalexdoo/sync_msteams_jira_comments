@@ -12,7 +12,7 @@ use crate::{
     ms_graph_api::{message::MsGraphMessage, model::MSGraphAPIShared}, 
 };
 
-use super::helpers;
+use super::helpers::{self, log_to_file};
 
 
 #[derive(Debug, Deserialize)]
@@ -36,7 +36,16 @@ pub(crate) async fn handler(
     req: Option<Json<Request>>, 
 ) -> Result<(StatusCode, String)> {
     if let Some(Json(request)) = req {
-        tokio::task::spawn(async move { handle_teams_request(request, &graph_api, &jira_api).await });
+        tokio::task::spawn(
+            async move { 
+                if let Err(e) = handle_teams_request(request, &graph_api, &jira_api).await {
+                    log_to_file("teams", &e.to_string());
+                    Err(e)
+                } else {
+                    Ok(())
+                }
+            }
+        );
     };
     
     let response = match query {

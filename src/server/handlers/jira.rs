@@ -17,6 +17,8 @@ use crate::jira_api::model::JiraAPIShared;
 use crate::ms_graph_api::model::MSGraphAPIShared;
 use crate::server::error::{Context as ApiContext, Error as ApiError};
 
+use super::helpers::log_to_file;
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct IssueRequest {
@@ -61,17 +63,30 @@ pub(crate) async fn handler(
     State(graph_api): State<MSGraphAPIShared>,
     headers: HeaderMap,
     payload: axum::body::Bytes,
-) -> ApiResult<StatusCode, ApiError> {
+)-> ApiResult<StatusCode, ApiError> {
+    match parse_handler(jira_api, graph_api, headers, payload).await {
+        Ok(()) => Ok(StatusCode::OK),
+        Err(e) => {
+            log_to_file("jira", &e.to_string()).await;
+            return ApiError::c500(e);
+        }
+    }
+}
+
+async fn parse_handler(
+    jira_api: JiraAPIShared,
+    graph_api: MSGraphAPIShared,
+    headers: HeaderMap,
+    payload: axum::body::Bytes,
+) -> Result<()> {
+
     let signature = get_signature_from_headers(headers)
-        .map_err(ApiError::c500)
         .context("Failed to get signature")?;
 
     validate_signature(&payload, &jira_api.config.secret, &signature)
-        .map_err(ApiError::c500)
         .context("Failed to validate signature")?;
 
     let json_payload = serde_json::from_slice::<Value>(&payload)
-        .map_err(ApiError::c500)
         .context("Failed to deserialize payload")?;
 
     let webhook_event = format!("{}",
@@ -86,7 +101,7 @@ pub(crate) async fn handler(
         handle_jira_request(webhook_event, payload, &jira_api, &graph_api).await 
     });
 
-    Ok(StatusCode::OK)
+    Ok(())
 }
 
 fn validate_signature(payload: &Bytes, secret: &String, signature: &Signature) -> Result<()> {
@@ -203,13 +218,18 @@ async fn parse_issue(payload: Bytes, graph_api: &MSGraphAPIShared) -> Result<()>
 }
 
 async fn handle_jira_request(webhook_event: String, payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSGraphAPIShared) -> anyhow::Result<()> {
-    match webhook_event.as_str() {
+    let result = match webhook_event.as_str() {
         "comment_created" | "comment_updated" => { 
-                parse_comment(payload, jira_api, graph_api).await?; 
+                parse_comment(payload, jira_api, graph_api).await.context("Failed to parse comment")
             },
         _ => { 
-                parse_issue(payload, graph_api).await?;
+                parse_issue(payload, graph_api).await.context("Failed to parse issue")
             },
+    };
+
+    if let Err(e) = result {
+        log_to_file("handle jira request", &e.to_string()).await;
+        return Err(e);
     }
 
     Ok(())
