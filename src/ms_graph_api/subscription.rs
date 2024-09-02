@@ -12,7 +12,7 @@ pub struct Subscription {
     subscription_secret: Uuid,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct NewSubsciptionRequest {
     change_type: String,
@@ -47,6 +47,7 @@ impl Subscription {
     pub async fn init(&mut self, client: &Client, config: &Config, access_token: &String, repeated: bool) -> Result<()> {
         let subscription_secret = Uuid::new_v4();
 println!("1");
+println!("{access_token}");
         let response = add_subscription_response(config, client, access_token, &subscription_secret).await?;
 println!("2: {}", response.status());
         if response.status().is_success() {
@@ -135,7 +136,7 @@ async fn kill_active_subscription(client: &Client, access_token: &String) -> Res
         .send()
         .await
         .context("Failed to send get subscription request")?;
-println!("{access_token}");
+
     if response.status().is_success() {
         if let Ok(s) = response.json::<ActiveSubsciptionResponse>().await {
             if let Some(r) = s.value.first() {
@@ -163,6 +164,9 @@ async fn add_subscription_response(config: &Config, client: &Client, access_toke
         expiration_date_time: Utc::now() + chrono::Duration::try_hours(3).unwrap(),
         client_state: subscription_secret.clone(),
     };
+
+println!("{access_token}");
+println!("{:#?}", req);
 
     client
         .post("https://graph.microsoft.com/v1.0/subscriptions")
