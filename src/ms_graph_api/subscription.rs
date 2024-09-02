@@ -135,7 +135,7 @@ async fn kill_active_subscription(client: &Client, access_token: &String) -> Res
         .send()
         .await
         .context("Failed to send get subscription request")?;
-
+println!("{access_token}");
     if response.status().is_success() {
         if let Ok(s) = response.json::<ActiveSubsciptionResponse>().await {
             if let Some(r) = s.value.first() {
