@@ -46,18 +46,21 @@ impl Subscription {
 
     pub async fn init(&mut self, client: &Client, config: &Config, access_token: &String, repeated: bool) -> Result<()> {
         let subscription_secret = Uuid::new_v4();
+println!("1");
         let response = add_subscription_response(config, client, access_token, &subscription_secret).await?;
-
+println!("2: {}", response.status());
         if response.status().is_success() {
             self.subscription_secret = subscription_secret;
             self.subscription_id = response.json::<NewSubsciptionResponse>().await.context("Failed to retrieve subscription ID")?.id;
         } else if response.status() == StatusCode::FORBIDDEN {
+println!("3");
             if repeated {
                 bail!("Failed to kill active subscription");
             } else {
                 kill_active_subscription(client, access_token).await?;
-                
+println!("4");                
                 let response = add_subscription_response(config, client, access_token, &subscription_secret).await?;
+println!("5");
                 ensure!(response.status().is_success(), response.text().await?);
 
                 self.subscription_secret = subscription_secret;
@@ -66,7 +69,7 @@ impl Subscription {
         } else {
             bail!(response.text().await?)
         }
-
+println!("6");
         let auth_url = format!("https://login.microsoftonline.com/{}/oauth2/v2.0/authorize?client_id={}&scope=offline_access%20ChannelMessage.Send%20ChannelMessage.ReadWrite&response_type=code&redirect_uri={}&response_mode=form_post&state={}", config.tenant_id, config.client_id, config.oauth_url, subscription_secret);
         println!("{auth_url}");
         
