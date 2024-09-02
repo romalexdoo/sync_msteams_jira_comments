@@ -39,7 +39,7 @@ pub(crate) async fn handler(
         tokio::task::spawn(
             async move { 
                 if let Err(e) = handle_teams_request(request, &graph_api, &jira_api).await {
-                    log_to_file("teams", &e.to_string());
+                    log_to_file("teams", &e.to_string()).await;
                     Err(e)
                 } else {
                     Ok(())

@@ -15,7 +15,7 @@ use crate::jira_api::comment::JiraComment;
 use crate::jira_api::issue::Issue;
 use crate::jira_api::model::JiraAPIShared;
 use crate::ms_graph_api::model::MSGraphAPIShared;
-use crate::server::error::{Context as ApiContext, Error as ApiError};
+use crate::server::error::Error as ApiError;
 
 use super::helpers::log_to_file;
 

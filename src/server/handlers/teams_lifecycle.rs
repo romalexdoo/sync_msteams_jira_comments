@@ -1,3 +1,4 @@
+use anyhow::Context as _;
 use axum::{
     extract::{Query, State}, http::StatusCode, response::{
         IntoResponse, 
@@ -7,7 +8,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    server::error::{Context, Error}, 
+    server::error::Error, 
     ms_graph_api::model::MSGraphAPIShared
 };
 
@@ -39,7 +40,7 @@ pub(crate) async fn handler(
     if let Some(Json(request)) = req {
         if let Err(e) = parse_handler(graph_api, request).await {
             log_to_file("teams_lifecycle", &e.to_string()).await;
-            return Err(Error::c500(e));
+            return Err(Error::c500(e).into());
         }
     };
 

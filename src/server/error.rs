@@ -3,11 +3,11 @@ use serde::{ Serialize, Serializer};
 use std::fmt::Display;
 use validator::ValidationErrors;  //{ ValidationError, ValidationErrors};
 
-pub(crate) trait Context {
-    type Output;
+// pub(crate) trait Context {
+//     type Output;
 
-    fn context<C: ToString>(self, context: C) -> Self::Output;
-}
+//     fn context<C: ToString>(self, context: C) -> Self::Output;
+// }
 
 // pub(crate) trait NestedValidation {
 //     type Output;
@@ -108,22 +108,22 @@ impl Error {
     //     )
     // }
 
-    pub(crate) fn with_context<T: ToString>(mut self, c: T) -> Self {
-        self.context = Some(c.to_string());
-        self
-    }
+    // pub(crate) fn with_context<T: ToString>(mut self, c: T) -> Self {
+    //     self.context = Some(c.to_string());
+    //     self
+    // }
 
     fn serialize_status<S: Serializer>(status: &StatusCode, s: S) -> Result<S::Ok, S::Error> {
         s.serialize_u16(status.as_u16())
     }
 }
 
-impl<V> Context for Result<V, Error> {
-    type Output = Self;
-    fn context<C: ToString>(self, c: C) -> Self::Output {
-        self.map_err(|e| e.with_context(c))
-    }
-}
+// impl<V> Context for Result<V, Error> {
+//     type Output = Self;
+//     fn context<C: ToString>(self, c: C) -> Self::Output {
+//         self.map_err(|e| e.with_context(c))
+//     }
+// }
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
