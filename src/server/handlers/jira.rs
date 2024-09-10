@@ -206,7 +206,7 @@ async fn parse_issue(payload: Bytes, graph_api: &MSGraphAPIShared) -> Result<()>
         {
             if let Some(message_id) = extract_message_id_from_url(link.to_string()) {
                 if let Some(assignee) = request.issue.get_assignee_name() {
-                    let reply_body = format!("Задача назначена на пользователя {assignee}");
+                    let reply_body = format!("Вашей задачей будет заниматься {assignee}");
 
                     graph_api
                         .reply_to_issue(&message_id, &reply_body)
