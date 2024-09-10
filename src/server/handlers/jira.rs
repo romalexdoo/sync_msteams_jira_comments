@@ -202,10 +202,35 @@ async fn parse_issue(payload: Bytes, graph_api: &MSGraphAPIShared) -> Result<()>
             .changelog
             .items
             .iter()
+            .any(|i| i.field.to_lowercase() == String::from("assignee"))
+        {
+            if let Some(message_id) = extract_message_id_from_url(link.to_string()) {
+                if let Some(assignee) = request.issue.get_assignee_name() {
+                    let reply_body = format!("Задача назначена на пользователя {assignee}");
+
+                    graph_api
+                        .reply_to_issue(&message_id, &reply_body)
+                        .await
+                        .context("Failed to send notification to the channel")?;
+                }
+            }
+        }
+
+        if request
+            .changelog
+            .items
+            .iter()
             .any(|i| i.field.to_lowercase() == String::from("status"))
         {
             if let Some(message_id) = extract_message_id_from_url(link.to_string()) {
-                let reply_body = format!("Статус задачи изменён на {}", request.issue.get_status().unwrap_or_default());
+                let mut reply_body = format!("Статус задачи изменён на {}", request.issue.get_status().unwrap_or_default());
+
+                if request.issue.get_status().map_or(false, |s| s.to_lowercase() == "Implementation/Test".to_lowercase()) {
+                    reply_body.push_str("<br>Ваша задача выполнена. Проверьте и подтвердите, что всё ОК.<br>При отсутствиие ответа эта задача автоматически закроется через 7 дней");
+                } else if request.issue.final_status() {
+                    reply_body.push_str("<br>Ваша задача закрыта. Если проблема сохранилась, заведите новую задачу");
+                }
+
                 graph_api
                     .reply_to_issue(&message_id, &reply_body)
                     .await

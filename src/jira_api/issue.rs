@@ -6,7 +6,7 @@ use crate::ms_graph_api::{message::TeamsAttachment, model::MSGraphAPIShared};
 
 use super::{
     attachment::{add_attachments_urls_to_description, find_old_attached_images, replace_attachments, replace_images_in_description, JiraAttachment}, 
-    model::JiraAPIShared,
+    model::{JiraAPIShared, JiraUser},
 };
 
 
@@ -24,6 +24,7 @@ pub(crate) struct Issue {
 struct IssueFields {
     attachment: Vec<JiraAttachment>,
     description: String,
+    assignee: Option<JiraUser>,
     // comment: IssueCommentField,
     status: IssueStatus,
     // summary: String,
@@ -67,10 +68,28 @@ impl Issue {
             .map(|f| f.status.name.clone())
     }
 
+    pub(crate) fn final_status(&self) -> bool {
+        self.fields
+            .as_ref()
+            .map_or(false, |f| f.status.is_final())
+    }
+
     pub(crate) fn get_teams_link(&self) -> Option<String> {
         self.fields
             .as_ref()
             .and_then(|f| f.teams_link.clone())
+    }
+    
+    pub(crate) fn get_assignee_name(&self) -> Option<String> {
+        self.fields
+            .as_ref()
+            .and_then(|f| 
+                f.assignee.as_ref().and_then(|a| 
+                    a.display_name.as_ref().map(|dn| 
+                        dn.clone()
+                    )
+                )
+            )
     }
     
     pub(crate) async fn create_or_update (
