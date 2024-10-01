@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{Context as _, Result};
+use anyhow::{bail, Context as _, Result};
 use reqwest::Client;
 use serde::Deserialize;
 use tokio::sync::RwLock;
@@ -108,15 +108,21 @@ impl JiraAPI {
         let mut page = 0;
         
         loop {
-            let users = self.client
+            let result = self.client
                 .get(format!("{}/rest/api/3/users", self.config.base_url))
                 .query(&[("startAt", page * 50), ("maxResults", 50)])
                 .basic_auth(&self.config.user, Some(&self.config.token))
                 .send()
                 .await
-                .context("Failed to send get reporter request")?
-                .error_for_status()
-                .context("Get reporter request bad status")?
+                .context("Failed to send get reporter request")?;
+
+            if !result.status().is_success() {
+                let status = result.status();
+                let text = result.text().await.unwrap_or_default();
+                bail!("Get reporter request status: {}, text: {}", status, text);
+            }
+
+            let users = result
                 .json::<Vec<JiraUser>>()
                 .await
                 .context("Parse get reporter response")?;

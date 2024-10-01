@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
 
@@ -195,26 +195,31 @@ impl Issue {
         graph_api: &MSGraphAPIShared,
         message_id: &String,
     ) -> Result<Option<Self>> {
-        let jql = format!("project = \"{}\" AND \"MS Teams link[URL Field]\" = \"{}\"", jira_api.config.project_key, teams_url);
+        let jql = format!("project = \"{}\" AND \"{}\" = \"{}\"", jira_api.config.project_key, jira_api.config.msteams_link_field_jql_name, teams_url);
 
         #[derive(Deserialize)]
         struct SearchResponse {
             issues: Vec<Issue>,
         }
 
-        let mut response = jira_api.client
+        let result = jira_api.client
             .get(format!("{}/rest/api/2/search", jira_api.config.base_url))
             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
             .query(&[("maxResults", "1"), ("jql", &jql), ("fields", "*all")])
             .send()
             .await
-            .context("Failed to send search issue request")?
-            .error_for_status()
-            .context("Search request bad status")?
+            .context("Failed to send search issue request")?;
+
+        if !result.status().is_success() {
+            let status = result.status();
+            let text = result.text().await.unwrap_or_default();
+            bail!("Get reporter request status: {}, text: {}", status, text);
+        }
+
+        let mut response = result
             .json::<SearchResponse>()
             .await
             .context("Parse search issue response")?;
-
 
         if response.issues.len() != 1 {
             return Ok(None)

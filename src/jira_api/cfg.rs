@@ -14,4 +14,6 @@ pub struct Config {
     pub(crate) project_key: String,    
     #[envconfig(from = "JIRA_MSTEAMS_LINK_FIELD_NAME", default = "")]
     pub(crate) msteams_link_field_name: String,    
+    #[envconfig(from = "JIRA_MSTEAMS_LINK_FIELD_JQL_NAME", default = "")]
+    pub(crate) msteams_link_field_jql_name: String,    
 }
