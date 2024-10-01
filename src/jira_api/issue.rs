@@ -213,7 +213,7 @@ impl Issue {
         if !result.status().is_success() {
             let status = result.status();
             let text = result.text().await.unwrap_or_default();
-            bail!("Get reporter request status: {}, text: {}", status, text);
+            bail!("Issue search request bad status: {}, text: {}", status, text);
         }
 
         let mut response = result
