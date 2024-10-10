@@ -35,6 +35,7 @@ pub(crate) async fn handler(
     State(graph_api): State<MSGraphAPIShared>,
     req: Option<Json<Request>>, 
 ) -> Result<(StatusCode, String)> {
+    log_to_file("teams handler", &format!("{:#?}", req)).await;
     if let Some(Json(request)) = req {
         tokio::task::spawn(
             async move { 
