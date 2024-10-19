@@ -165,52 +165,52 @@ impl JiraComment {
         Ok(())
     }
 
-    pub(crate) fn get_reply_id(&self) -> Option<String> {
-        Some(
-            self
-                .properties
-                .as_ref()?
-                .iter()
-                .find(|p| p.key == PROPERTY_KEY.to_string())?
-                .value
-                .as_ref()?
-                .teams_id
-                .clone()
-            )
-    }
+    // pub(crate) fn get_reply_id(&self) -> Option<String> {
+    //     Some(
+    //         self
+    //             .properties
+    //             .as_ref()?
+    //             .iter()
+    //             .find(|p| p.key == PROPERTY_KEY.to_string())?
+    //             .value
+    //             .as_ref()?
+    //             .teams_id
+    //             .clone()
+    //         )
+    // }
 
-    pub(crate) async fn add_reply_id(&self, jira_api: &JiraAPIShared, reply_id: &String) -> Result<()> {
-        let payload = json!({
-            "teams_id": reply_id
-        });
+    // pub(crate) async fn add_reply_id(&self, jira_api: &JiraAPIShared, reply_id: &String) -> Result<()> {
+    //     let payload = json!({
+    //         "teams_id": reply_id
+    //     });
 
-        jira_api.client
-            .put(format!("{}/rest/api/2/comment/{}/properties/{}", jira_api.config.base_url, self.id, PROPERTY_KEY))
-            .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
-            .json(&payload)
-            .send()
-            .await
-            .context("Failed to send set property request")?
-            .error_for_status()
-            .context("Set property request bad status")?;
+    //     jira_api.client
+    //         .put(format!("{}/rest/api/2/comment/{}/properties/{}", jira_api.config.base_url, self.id, PROPERTY_KEY))
+    //         .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
+    //         .json(&payload)
+    //         .send()
+    //         .await
+    //         .context("Failed to send set property request")?
+    //         .error_for_status()
+    //         .context("Set property request bad status")?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
-    pub(crate) async fn get(jira_api: &JiraAPIShared, issue_id: &String, comment_id: &String) -> Result<Self> {
-        Ok(
-            jira_api.client
-                .get(format!("{}/rest/api/2/issue/{}/comment/{}", jira_api.config.base_url, issue_id, comment_id))
-                .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
-                .query(&[("expand", "properties")])
-                .send()
-                .await
-                .context("Failed to get comments issue request")?
-                .error_for_status()
-                .context("Get comments request bad status")?
-                .json::<JiraComment>()
-                .await
-                .context("Parse get comments response")?
-        )
-    }
+    // pub(crate) async fn get(jira_api: &JiraAPIShared, issue_id: &String, comment_id: &String) -> Result<Self> {
+    //     Ok(
+    //         jira_api.client
+    //             .get(format!("{}/rest/api/2/issue/{}/comment/{}", jira_api.config.base_url, issue_id, comment_id))
+    //             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
+    //             .query(&[("expand", "properties")])
+    //             .send()
+    //             .await
+    //             .context("Failed to get comments issue request")?
+    //             .error_for_status()
+    //             .context("Get comments request bad status")?
+    //             .json::<JiraComment>()
+    //             .await
+    //             .context("Parse get comments response")?
+    //     )
+    // }
 }

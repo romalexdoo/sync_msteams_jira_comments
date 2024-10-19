@@ -11,6 +11,7 @@ use super::{
 
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct Issue {
     id: String,
     key: String,
@@ -30,6 +31,7 @@ struct IssueFields {
     // summary: String,
     teams_link: Option<String>,
 }
+
 
 // #[derive(Deserialize)]
 // struct IssueCommentField {

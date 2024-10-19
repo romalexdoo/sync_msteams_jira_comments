@@ -4,14 +4,15 @@ use axum::extract::State;
 use axum::http::{header::HeaderMap, HeaderName, StatusCode};
 use axum::response::Result as ApiResult;
 use axum::Extension;
+use chrono_tz::Europe::Moscow;
 use hmac::{Hmac, Mac};
-use regex::Regex;
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::Sha256;
 type HmacSha256 = Hmac<Sha256>;
 
 use crate::jira_api::comment::JiraComment;
+use crate::jira_api::comment_v3::JiraCommentV3;
 use crate::jira_api::issue::Issue;
 use crate::jira_api::model::JiraAPIShared;
 use crate::ms_graph_api::model::MSGraphAPIShared;
@@ -158,22 +159,12 @@ async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSG
     let issue = Issue::get_issue(jira_api, &request.issue.id).await.context("Failed to get comment issue by id")?;
 
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
-        let mut text = request.comment.body;
+        let comment = JiraCommentV3::get(jira_api, &issue.get_id(), &request.comment.id).await?;
 
-        let re = Regex::new(r"\[~accountid:([^\]]+)\]").expect("Failed to compile regex");
+        let mut body = comment.body.clone();
 
-        for cap in re.captures_iter(&text.clone()) {
-            let account_id = &cap[1].to_string();
-            if let Ok(user) = jira_api.find_user_by_id(account_id).await {
-                if let Some(username) = user.display_name.or(user.email_address) {
-                    let full_match = cap.get(0).unwrap().as_str();
-                    text = text.replace(full_match, format!("{}", username.as_str()).as_str());
-                }
-            }
-        }
-        
-        let reply_body = markdown_to_html_parser::parse_markdown(&text);
-        let comment = JiraComment::get(jira_api, &issue.get_id(), &request.comment.id).await?;
+        body.replace_media_urls(&jira_api.config.base_url, &comment.rendered_body);
+        let reply_body = body.to_html(Some(Moscow));
 
         if let Some(reply_id) = comment.get_reply_id() {
             graph_api
