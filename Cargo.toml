@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-adf2html = "0.2.0"
-anyhow = "1.0.86"
+adf2html = "0.2.1"
+anyhow = "1.0.91"
 axum = "0.7.5"
 axum-server = { version = "0.6", features = ["tls-rustls"] }
 base64 = "0.22.1"
@@ -25,11 +25,11 @@ regex = "1.10.6"
 reqwest = { version = "0.12.7", features = ["rustls-tls", "cookies", "gzip", "json", "multipart"] }
 rustls-pemfile = "1.0"
 scraper = "0.20.0"
-serde = { version = "1.0.209", features = ["derive"] }
-serde_json = "1.0.127"
+serde = { version = "1.0.213", features = ["derive"] }
+serde_json = "1.0.132"
 sha2 = "0.10.8"
 time = "0.3.36"
-tokio = { version = "1.40.0", features = ["full"] }
+tokio = { version = "1.41.0", features = ["full"] }
 tokio-rustls = "0.25"
 tower = { version = "0.4", features = ["make"] }
 tower-cookies = "0.10.0"
