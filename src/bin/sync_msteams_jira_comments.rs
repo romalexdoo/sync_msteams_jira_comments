@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
     // Wait server start and init subscription
     let api = state_shared.clone();
     tokio::task::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
         let mut tx = api.microsoft.state.lock().await;
         let token = match tx.token.get() {
