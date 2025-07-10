@@ -26,7 +26,7 @@ pub(crate) struct JiraCommentProperty {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct JiraCommentPropertyValue {
-    pub(crate) teams_id: String,
+    pub(crate) teams_id: Option<String>,
 }
 
 impl JiraCommentV3 {
@@ -73,17 +73,15 @@ impl JiraCommentV3 {
     // }
 
     pub(crate) fn get_reply_id(&self) -> Option<String> {
-        Some(
-            self
-                .properties
-                .as_ref()?
-                .iter()
-                .find(|p| p.key == PROPERTY_KEY.to_string())?
-                .value
-                .as_ref()?
-                .teams_id
-                .clone()
-            )
+        self
+            .properties
+            .as_ref()?
+            .iter()
+            .find(|p| p.key == PROPERTY_KEY.to_string())?
+            .value
+            .as_ref()?
+            .teams_id
+            .clone()
     }
 
     pub(crate) async fn add_reply_id(&self, jira_api: &JiraAPI, reply_id: &String) -> Result<()> {
