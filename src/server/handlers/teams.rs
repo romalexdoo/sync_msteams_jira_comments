@@ -17,7 +17,7 @@ use super::helpers::{self, log_to_file};
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Request {
-    pub(crate) value: Vec<RequestValue>,
+    pub(crate) value: Option<Vec<RequestValue>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,57 +61,59 @@ async fn handle_teams_request(request: Request, state_shared: AppStateShared) ->
         },
     };
 
-    for value in request.value {
-        tx.subscription.check_client_secret(&value.client_state)?;
+    if let Some(values) = request.value {
+        for value in values {
+            tx.subscription.check_client_secret(&value.client_state)?;
 
-        let (maybe_message_id, maybe_reply_id) = helpers::get_message_id_and_reply_id(&value.resource);
-        
-        if let Some(message_id) = maybe_message_id {
-            let message = MsGraphMessage::get(&state_shared.microsoft.client, &value.resource, &token).await?;
+            let (maybe_message_id, maybe_reply_id) = helpers::get_message_id_and_reply_id(&value.resource);
+            
+            if let Some(message_id) = maybe_message_id {
+                let message = MsGraphMessage::get(&state_shared.microsoft.client, &value.resource, &token).await?;
 
-            let user_email = match message.from.user {
-                Some(u) => state_shared.microsoft.get_user_email(&token, u.id).await?,
-                None => String::new(),
-            };
+                let user_email = match message.from.user {
+                    Some(u) => state_shared.microsoft.get_user_email(&token, u.id).await?,
+                    None => String::new(),
+                };
 
-            if user_email == state_shared.microsoft.config.teams_user {
-                continue;
-            }
+                if user_email == state_shared.microsoft.config.teams_user {
+                    continue;
+                }
 
-            if let Some(reply_id) = maybe_reply_id {
-                let message_url = &value.resource.split("/replies").next().unwrap_or_default().to_string();
-                let parent_message = MsGraphMessage::get(&state_shared.microsoft.client, message_url, &token).await?;
+                if let Some(reply_id) = maybe_reply_id {
+                    let message_url = &value.resource.split("/replies").next().unwrap_or_default().to_string();
+                    let parent_message = MsGraphMessage::get(&state_shared.microsoft.client, message_url, &token).await?;
 
-                JiraComment::create_or_update(
-                        state_shared.clone(),
-                        &message.body.content, 
-                        &user_email, 
-                        &message.attachments,
-                        &token,
-                        &parent_message.web_url.unwrap_or_default(),
-                        &reply_id,
-                        &message_id,
-                    )
-                    .await?;
-            } else {
-                let (issue, issue_exists) = Issue::create_or_update(
-                        state_shared.clone(),
-                        &message.subject.unwrap_or_default(), 
-                        &message.body.content, 
-                        &user_email, 
-                        &message.attachments,
-                        &token,
-                        &message.web_url.unwrap_or_default(),
-                        &message_id,
-                    )
-                    .await?;
-
-                if !issue_exists {
-                    let url = format!("{}/browse/{}", state_shared.jira.config.base_url, issue.get_key());
-
-                    state_shared.microsoft
-                        .reply_to_issue(&message_id, &format!("<a href=\"{}\">{}</a>", url, url))
+                    JiraComment::create_or_update(
+                            state_shared.clone(),
+                            &message.body.content, 
+                            &user_email, 
+                            &message.attachments,
+                            &token,
+                            &parent_message.web_url.unwrap_or_default(),
+                            &reply_id,
+                            &message_id,
+                        )
                         .await?;
+                } else {
+                    let (issue, issue_exists) = Issue::create_or_update(
+                            state_shared.clone(),
+                            &message.subject.unwrap_or_default(), 
+                            &message.body.content, 
+                            &user_email, 
+                            &message.attachments,
+                            &token,
+                            &message.web_url.unwrap_or_default(),
+                            &message_id,
+                        )
+                        .await?;
+
+                    if !issue_exists {
+                        let url = format!("{}/browse/{}", state_shared.jira.config.base_url, issue.get_key());
+
+                        state_shared.microsoft
+                            .reply_to_issue(&message_id, &format!("<a href=\"{}\">{}</a>", url, url))
+                            .await?;
+                    }
                 }
             }
         }

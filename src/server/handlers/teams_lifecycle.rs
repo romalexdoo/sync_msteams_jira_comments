@@ -17,7 +17,7 @@ use super::helpers::{self, log_to_file};
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Request {
-    pub(crate) value: Vec<RequestValue>,
+    pub(crate) value: Option<Vec<RequestValue>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,23 +59,25 @@ async fn parse_handler(graph_api: &MSGraphAPI, request: Request) -> anyhow::Resu
         
     let token = tx.token.renew(&graph_api.client, &graph_api.config).await.context("Failed to get token")?;
 
-    for value in request.value {
-        tx.subscription.check_client_secret(&value.client_state).context("Failed to check secret")?;
+    if let Some(values) = request.value {
+        for value in values {
+            tx.subscription.check_client_secret(&value.client_state).context("Failed to check secret")?;
 
-        match value.lifecycle_event.as_str() {
-            "reauthorizationRequired" => {
-                    tx.subscription
-                        .renew(&graph_api.client, &token, &value.subscription_id)
-                        .await
-                        .context("Failed to renew subscription")?;
-                },
-            "subscriptionRemoved" => {
-                    tx.subscription
-                        .init(&graph_api.client, &graph_api.config, &token, false)
-                        .await
-                        .context("Failed to init new subscription")?;
-                },
-            _ => (),
+            match value.lifecycle_event.as_str() {
+                "reauthorizationRequired" => {
+                        tx.subscription
+                            .renew(&graph_api.client, &token, &value.subscription_id)
+                            .await
+                            .context("Failed to renew subscription")?;
+                    },
+                "subscriptionRemoved" => {
+                        tx.subscription
+                            .init(&graph_api.client, &graph_api.config, &token, false)
+                            .await
+                            .context("Failed to init new subscription")?;
+                    },
+                _ => (),
+            }
         }
     }
 
