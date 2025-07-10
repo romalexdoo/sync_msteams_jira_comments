@@ -1,10 +1,9 @@
 use crate::cfg::Config;
-use crate::jira_api::model::JiraAPIShared;
+use crate::jira_api::model::JiraAPI;
 use crate::server::handlers::{jira, teams, teams_lifecycle, ms_oauth};
-use crate::ms_graph_api::model::MSGraphAPIShared;
+use crate::ms_graph_api::model::MSGraphAPI;
 use anyhow::{ Context, Result };
 use axum::{
-    Extension,
     Router,
     routing::post,
 };
@@ -19,13 +18,20 @@ pub struct Server {
     handle: Handle,
 }
 
+pub struct AppState {
+    pub jira: JiraAPI,
+    pub microsoft: MSGraphAPI,
+}
+
+pub type AppStateShared = Arc<AppState>;
+
 impl Server {
     pub fn new() -> Self {
         Self { handle: Handle::new() }
     }
 
     /// Starts API server.
-    pub async fn start(&self, cfg: Arc<Config>, graph_api: MSGraphAPIShared, jira_api: JiraAPIShared) -> Result<()> {
+    pub async fn start(&self, cfg: Config, state_shared: AppStateShared) -> Result<()> {
         // Create router.
         // Middleware ordering matters!
         // Request processing starts from last layer.
@@ -36,10 +42,8 @@ impl Server {
             .route("/teams", post(teams::handler))
             .route("/teams_lifecycle", post(teams_lifecycle::handler))
             .route("/ms_oauth", post(ms_oauth::handler))
-            // Injects Jira API.
-            .layer(Extension(jira_api))
             // Injects MS Graph API.
-            .with_state(graph_api)
+            .with_state(state_shared)
             // Compression.
             .layer(CompressionLayer::new());
         

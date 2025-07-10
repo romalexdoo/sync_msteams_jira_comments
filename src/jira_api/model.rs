@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::{bail, Context as _, Result};
 use reqwest::Client;
 use serde::Deserialize;
@@ -9,8 +7,6 @@ use crate::utils::get_reqwest_client;
 
 use super::cfg::Config;
 
-
-pub(crate) type JiraAPIShared = Arc<JiraAPI>;
 
 pub struct JiraAPI {
     pub(crate) config: Config,

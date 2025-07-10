@@ -3,7 +3,6 @@ use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::{header::HeaderMap, HeaderName, StatusCode};
 use axum::response::Result as ApiResult;
-use axum::Extension;
 use chrono_tz::Europe::Moscow;
 use hmac::{Hmac, Mac};
 use serde::Deserialize;
@@ -14,9 +13,9 @@ type HmacSha256 = Hmac<Sha256>;
 use crate::jira_api::comment::JiraComment;
 use crate::jira_api::comment_v3::JiraCommentV3;
 use crate::jira_api::issue::Issue;
-use crate::jira_api::model::JiraAPIShared;
-use crate::ms_graph_api::model::MSGraphAPIShared;
+use crate::ms_graph_api::model::MSGraphAPI;
 use crate::server::error::Error as ApiError;
+use crate::server::server::AppStateShared;
 
 use super::helpers::log_to_file;
 
@@ -60,12 +59,11 @@ struct Signature {
 }
 
 pub(crate) async fn handler(
-    Extension(jira_api): Extension<JiraAPIShared>,
-    State(graph_api): State<MSGraphAPIShared>,
+    State(state_shared): State<AppStateShared>,
     headers: HeaderMap,
     payload: axum::body::Bytes,
 )-> ApiResult<StatusCode, ApiError> {
-    match parse_handler(jira_api, graph_api, headers, payload).await {
+    match parse_handler(state_shared, headers, payload).await {
         Ok(()) => Ok(StatusCode::OK),
         Err(e) => {
             log_to_file("jira", &e.to_string()).await;
@@ -75,8 +73,7 @@ pub(crate) async fn handler(
 }
 
 async fn parse_handler(
-    jira_api: JiraAPIShared,
-    graph_api: MSGraphAPIShared,
+    state_shared: AppStateShared,
     headers: HeaderMap,
     payload: axum::body::Bytes,
 ) -> Result<()> {
@@ -84,7 +81,7 @@ async fn parse_handler(
     let signature = get_signature_from_headers(headers)
         .context("Failed to get signature")?;
 
-    validate_signature(&payload, &jira_api.config.secret, &signature)
+    validate_signature(&payload, &state_shared.jira.config.secret, &signature)
         .context("Failed to validate signature")?;
 
     let json_payload = serde_json::from_slice::<Value>(&payload)
@@ -99,7 +96,7 @@ async fn parse_handler(
         );
 
     tokio::task::spawn(async move { 
-        handle_jira_request(webhook_event, payload, &jira_api, &graph_api).await 
+        handle_jira_request(webhook_event, payload, state_shared).await 
     });
 
     Ok(())
@@ -145,46 +142,46 @@ fn get_signature_from_headers(headers: HeaderMap) -> Result<Signature> {
     })
 }
 
-async fn parse_comment(payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSGraphAPIShared) -> Result<()> {
+async fn parse_comment(payload: Bytes, state_shared: AppStateShared) -> Result<()> {
     let request = serde_json::from_slice::<CommentRequest>(&payload)
         .context("Failed to deserialize payload")?;
-    let author = jira_api.find_user_by_id(&request.comment.update_author.account_id).await.context("Failed to get author")?;
+    let author = state_shared.jira.find_user_by_id(&request.comment.update_author.account_id).await.context("Failed to get author")?;
 
     if let Some(author_email) = author.email_address {
-        if author_email.to_lowercase() == jira_api.config.user.to_lowercase() {
+        if author_email.to_lowercase() == state_shared.jira.config.user.to_lowercase() {
             return Ok(());
         }
     }
 
-    let issue = Issue::get_issue(jira_api, &request.issue.id).await.context("Failed to get comment issue by id")?;
+    let issue = Issue::get_issue(&state_shared.jira, &request.issue.id).await.context("Failed to get comment issue by id")?;
 
     if let Some(message_id) = extract_message_id_from_url(issue.get_teams_link().unwrap_or_default()) {
-        let comment = JiraCommentV3::get(jira_api, &issue.get_id(), &request.comment.id).await?;
+        let comment = JiraCommentV3::get(&state_shared.jira, &issue.get_id(), &request.comment.id).await?;
 
         let mut body = comment.body.clone();
 
-        body.replace_media_urls(&jira_api.config.base_url, &comment.rendered_body);
+        body.replace_media_urls(&state_shared.jira.config.base_url, &comment.rendered_body);
         let reply_body = body.to_html(Some(Moscow));
 
         if let Some(reply_id) = comment.get_reply_id() {
-            graph_api
+            state_shared.microsoft
                 .edit_reply(&message_id, &reply_id, &reply_body)
                 .await
                 .context("Failed to update reply in channel")?;
         } else {
-            let reply_id = graph_api
+            let reply_id = state_shared.microsoft
                 .reply_to_issue(&message_id, &reply_body)
                 .await
                 .context("Failed to add reply to the channel")?
                 .id;
-            comment.add_reply_id(jira_api, &reply_id).await?;
+            comment.add_reply_id(&state_shared.jira, &reply_id).await?;
         }
     }
 
     Ok(())
 }
 
-async fn parse_issue(payload: Bytes, graph_api: &MSGraphAPIShared) -> Result<()> {
+async fn parse_issue(payload: Bytes, graph_api: &MSGraphAPI) -> Result<()> {
     let request = serde_json::from_slice::<IssueRequest>(&payload)
         .context("Failed to deserialize payload")?;
 
@@ -233,13 +230,13 @@ async fn parse_issue(payload: Bytes, graph_api: &MSGraphAPIShared) -> Result<()>
     Ok(())
 }
 
-async fn handle_jira_request(webhook_event: String, payload: Bytes, jira_api: &JiraAPIShared, graph_api: &MSGraphAPIShared) -> anyhow::Result<()> {
+async fn handle_jira_request(webhook_event: String, payload: Bytes, state_shared: AppStateShared) -> anyhow::Result<()> {
     let result = match webhook_event.as_str() {
         "comment_created" | "comment_updated" => { 
-                parse_comment(payload, jira_api, graph_api).await.context("Failed to parse comment")
+                parse_comment(payload, state_shared).await.context("Failed to parse comment")
             },
         _ => { 
-                parse_issue(payload, graph_api).await.context("Failed to parse issue")
+                parse_issue(payload, &state_shared.microsoft).await.context("Failed to parse issue")
             },
     };
 

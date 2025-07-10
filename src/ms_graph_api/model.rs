@@ -7,7 +7,6 @@ use tokio::{
     time::{sleep, Duration},
 };
 use uuid::Uuid;
-use std::sync::Arc;
 
 use crate::utils::get_reqwest_client;
 
@@ -15,8 +14,6 @@ use super::{cfg::Config, message::MsGraphMessage};
 use super::delegated_token::GrantedToken;
 use super::subscription::Subscription;
 use super::token::ApplicationToken;
-
-pub(crate) type MSGraphAPIShared = Arc<MSGraphAPI>;
 
 pub struct MSGraphAPI {
     pub state: Mutex<MSGraphAPIState>,

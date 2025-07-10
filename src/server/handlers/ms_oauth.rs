@@ -4,7 +4,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::ms_graph_api::model::MSGraphAPIShared;
+use crate::server::server::AppStateShared;
 
 
 #[derive(Debug, Deserialize)]
@@ -14,15 +14,15 @@ pub(crate) struct OAuthRequest {
 }
 
 pub(crate) async fn handler(
-    State(graph_api): State<MSGraphAPIShared>,
+    State(state_shared): State<AppStateShared>,
     Form(data): Form<OAuthRequest>,
 ) -> Html<String> {
-    
-    if graph_api.state.lock().await.subscription.check_client_secret(&data.state).is_err() {
+
+    if state_shared.microsoft.state.lock().await.subscription.check_client_secret(&data.state).is_err() {
         return get_html("Error", "Failed to check secret");
     }
 
-    if graph_api.set_delegated_token(data.code).await.is_err() {
+    if state_shared.microsoft.set_delegated_token(data.code).await.is_err() {
         return get_html("Error", "Failed to set delegated token");
     }
 

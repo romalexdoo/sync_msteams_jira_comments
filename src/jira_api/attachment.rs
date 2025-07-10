@@ -3,11 +3,11 @@ use regex::Regex;
 use reqwest::multipart::{Form, Part};
 use serde::Deserialize;
 
-use crate::ms_graph_api::{
+use crate::{jira_api::model::JiraAPI, ms_graph_api::{
     image::GraphApiImage, message::TeamsAttachment
-};
+}};
 
-use super::{issue::Issue, model::JiraAPIShared};
+use super::issue::Issue;
 
 
 #[derive(Clone, Debug, Deserialize)]
@@ -59,7 +59,7 @@ pub(crate) async fn replace_images_in_description(
 }
 
 pub(crate) async fn replace_attachments(
-    jira_api: &JiraAPIShared, 
+    jira_api: &JiraAPI, 
     issue: &Issue, 
     old_image_names: &Vec<String>, 
     new_images: &Vec<GraphApiImage>
@@ -85,7 +85,7 @@ pub(crate) async fn replace_attachments(
     Ok(())
 }
 
-async fn upload_image(jira_api: &JiraAPIShared, issue: &Issue, image: &GraphApiImage) -> Result<()> {
+async fn upload_image(jira_api: &JiraAPI, issue: &Issue, image: &GraphApiImage) -> Result<()> {
     let img_data = Part::bytes(image.data.clone())
         .file_name(image.name.clone())
         .mime_str(&image.mime_str)?;
@@ -123,7 +123,7 @@ fn replace_img_tag_for_jira(text: &String, search_url: &String, replace_with: &S
     re.replace_all(text, format!("\n\n!{}!\n\n", replace_with)).into_owned()
 }
 
-async fn delete_attachment(jira_api: &JiraAPIShared, attachment_id: &String) -> Result<()> {
+async fn delete_attachment(jira_api: &JiraAPI, attachment_id: &String) -> Result<()> {
     jira_api.client
         .delete(format!("{}/rest/api/2/attachment/{}", jira_api.config.base_url, attachment_id))
         .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))

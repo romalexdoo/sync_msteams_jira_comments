@@ -2,11 +2,11 @@ use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
 
-use crate::ms_graph_api::{message::TeamsAttachment, model::MSGraphAPIShared};
+use crate::{jira_api::model::JiraAPI, ms_graph_api::message::TeamsAttachment, server::server::AppStateShared};
 
 use super::{
     attachment::{add_attachments_urls_to_description, find_old_attached_images, replace_attachments, replace_images_in_description, JiraAttachment}, 
-    model::{JiraAPIShared, JiraUser},
+    model::JiraUser,
 };
 
 
@@ -95,14 +95,13 @@ impl Issue {
     }
     
     pub(crate) async fn create_or_update (
-        jira_api: &JiraAPIShared,
+        state_shared: AppStateShared,
         summary: &String, 
         description: &String, 
         reporter_email: &String, 
         attachments: &Vec<TeamsAttachment>,
         graph_api_token: &String,
         message_url: &String,
-        graph_api: &MSGraphAPIShared,
         message_id: &String,
     ) -> Result<(Self, bool)> {
         let mut summary = summary.clone();
@@ -121,7 +120,7 @@ impl Issue {
         let mut payload = json!({
             "fields": {
                 "project": {
-                    "key": jira_api.config.project_key
+                    "key": state_shared.jira.config.project_key
                 },
                 "summary": summary,
                 "description": description_v2.clone(),
@@ -137,9 +136,9 @@ impl Issue {
             "teams_link": message_url
         });
 
-        fields.insert(jira_api.config.msteams_link_field_name.clone(), teams_link["teams_link"].clone());
+        fields.insert(state_shared.jira.config.msteams_link_field_name.clone(), teams_link["teams_link"].clone());
 
-        let reporter_id = jira_api
+        let reporter_id = state_shared.jira
             .get_jira_user_by_email(reporter_email).await?.map(|u| u.account_id)
             .unwrap_or_default();
     
@@ -154,7 +153,7 @@ impl Issue {
         }
     
         
-        let mut maybe_issue = Issue::find(jira_api, message_url, graph_api, message_id).await?;
+        let mut maybe_issue = Issue::find(state_shared.clone(), message_url, message_id).await?;
         let issue_exists = maybe_issue.is_some();
     
         if !issue_exists {
@@ -163,9 +162,9 @@ impl Issue {
                 id: String,
             }
 
-            let result = jira_api.client
-                        .post(format!("{}/rest/api/2/issue", jira_api.config.base_url))
-                        .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
+            let result = state_shared.jira.client
+                        .post(format!("{}/rest/api/2/issue", state_shared.jira.config.base_url))
+                        .basic_auth(&state_shared.jira.config.user, Some(&state_shared.jira.config.token))
                         .json(&payload)
                         .send()
                         .await
@@ -176,37 +175,36 @@ impl Issue {
                         .await
                         .context("Parse create issue response")?;
             
-            maybe_issue = Issue::get_issue(jira_api, &result.id).await.ok();
+            maybe_issue = Issue::get_issue(&state_shared.jira, &result.id).await.ok();
         } else {
             let issue = maybe_issue.as_mut().unwrap();
-            issue.update(jira_api, &payload).await?;
+            issue.update(&state_shared.jira, &payload).await?;
         }
     
         let issue = maybe_issue.ok_or(anyhow!("Failed to get created issue"))?;
 
         let old_image_names = find_old_attached_images(&issue.get_description().unwrap_or_default());
 
-        replace_attachments(jira_api, &issue, &old_image_names, &images).await.context("Failed to replace attachments")?;
+        replace_attachments(&state_shared.jira, &issue, &old_image_names, &images).await.context("Failed to replace attachments")?;
     
         Ok((issue, issue_exists))
     }
 
     pub(crate) async fn find(
-        jira_api: &JiraAPIShared, 
+        state_shared: AppStateShared, 
         teams_url: &String,
-        graph_api: &MSGraphAPIShared,
         message_id: &String,
     ) -> Result<Option<Self>> {
-        let jql = format!("project = \"{}\" AND \"{}\" = \"{}\"", jira_api.config.project_key, jira_api.config.msteams_link_field_jql_name, teams_url);
+        let jql = format!("project = \"{}\" AND \"{}\" = \"{}\"", state_shared.jira.config.project_key, state_shared.jira.config.msteams_link_field_jql_name, teams_url);
 
         #[derive(Deserialize)]
         struct SearchResponse {
             issues: Vec<Issue>,
         }
 
-        let result = jira_api.client
-            .get(format!("{}/rest/api/2/search/jql", jira_api.config.base_url))
-            .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
+        let result = state_shared.jira.client
+            .get(format!("{}/rest/api/2/search/jql", state_shared.jira.config.base_url))
+            .basic_auth(&state_shared.jira.config.user, Some(&state_shared.jira.config.token))
             .query(&[("maxResults", "1"), ("jql", &jql), ("fields", "*all")])
             .send()
             .await
@@ -230,7 +228,7 @@ impl Issue {
         let issue = response.issues.pop().unwrap();
 
         if issue.clone().fields.map_or(false, |i| i.status.is_final()) {
-            graph_api
+            state_shared.microsoft
                 .reply_to_issue(message_id, &String::from("Извините, но данная задача закрыта. Просим вас завести новую, иначе мы можем пропустить это сообщение"))
                 .await?;
         }
@@ -239,7 +237,7 @@ impl Issue {
     }
 
     pub(crate) async fn get_issue(
-        jira_api: &JiraAPIShared, 
+        jira_api: &JiraAPI, 
         issue_id: &String,
     ) -> Result<Self> {
         let issue = jira_api.client
@@ -257,7 +255,7 @@ impl Issue {
         Ok(issue)
     }
 
-    pub(crate) async fn update(&self, jira_api: &JiraAPIShared, payload: &Value) -> Result<()> {
+    pub(crate) async fn update(&self, jira_api: &JiraAPI, payload: &Value) -> Result<()> {
         jira_api.client
             .put(format!("{}/rest/api/2/issue/{}", jira_api.config.base_url, self.id))
             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))

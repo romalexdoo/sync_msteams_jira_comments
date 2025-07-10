@@ -8,8 +8,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    server::error::Error, 
-    ms_graph_api::model::MSGraphAPIShared
+    ms_graph_api::model::MSGraphAPI, server::{error::Error, server::AppStateShared}
 };
 
 use super::helpers::{self, log_to_file};
@@ -32,7 +31,7 @@ pub(crate) struct RequestValue {
 
 pub(crate) async fn handler(
     Query(query): Query<helpers::ValidationTokenQuery>, 
-    State(graph_api): State<MSGraphAPIShared>,
+    State(state_shared): State<AppStateShared>,
     req: Option<Json<Request>>
 ) -> Result<impl IntoResponse> {
     log_to_file("teams_lifecycle", &format!("{:?}", req)).await;
@@ -41,7 +40,7 @@ pub(crate) async fn handler(
     let mut reply_status = StatusCode::ACCEPTED;
 
     if let Some(Json(request)) = req {
-        if let Err(e) = parse_handler(graph_api, request).await {
+        if let Err(e) = parse_handler(&state_shared.microsoft, request).await {
             log_to_file("teams_lifecycle", &e.to_string()).await;
             return Err(Error::c500(e).into());
         }
@@ -58,7 +57,7 @@ pub(crate) async fn handler(
     Ok((reply_status, response))
 }
 
-async fn parse_handler(graph_api: MSGraphAPIShared, request: Request) -> anyhow::Result<()> {
+async fn parse_handler(graph_api: &MSGraphAPI, request: Request) -> anyhow::Result<()> {
     let mut tx = graph_api.state.lock().await;
         
     let token = tx.token.renew(&graph_api.client, &graph_api.config).await.context("Failed to get token")?;

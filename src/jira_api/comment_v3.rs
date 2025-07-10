@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::json;
 
-use super::model::JiraAPIShared;
+use super::model::JiraAPI;
 
 const PROPERTY_KEY: &str = "teams_id";
 
@@ -86,7 +86,7 @@ impl JiraCommentV3 {
             )
     }
 
-    pub(crate) async fn add_reply_id(&self, jira_api: &JiraAPIShared, reply_id: &String) -> Result<()> {
+    pub(crate) async fn add_reply_id(&self, jira_api: &JiraAPI, reply_id: &String) -> Result<()> {
         let payload = json!({
             "teams_id": reply_id
         });
@@ -104,7 +104,7 @@ impl JiraCommentV3 {
         Ok(())
     }
 
-    pub(crate) async fn get(jira_api: &JiraAPIShared, issue_id: &String, comment_id: &String) -> Result<Self> {
+    pub(crate) async fn get(jira_api: &JiraAPI, issue_id: &String, comment_id: &String) -> Result<Self> {
         Ok(
             jira_api.client
                 .get(format!("{}/rest/api/3/issue/{}/comment/{}", jira_api.config.base_url, issue_id, comment_id))
