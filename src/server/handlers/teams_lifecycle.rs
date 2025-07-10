@@ -6,7 +6,6 @@ use axum::{
     }, Json
 };
 use serde::Deserialize;
-use tracing::warn;
 
 use crate::{
     server::error::Error, 
@@ -36,8 +35,8 @@ pub(crate) async fn handler(
     State(graph_api): State<MSGraphAPIShared>,
     req: Option<Json<Request>>
 ) -> Result<impl IntoResponse> {
-    warn!("Teams lifecycle Received request: {:?}", req);
-    warn!("Teams lifecycle Query: {:?}", query.validation_token);
+    log_to_file("teams_lifecycle", &format!("{:?}", req)).await;
+    log_to_file("teams_lifecycle", &format!("{:?}", query.validation_token)).await;
     
     let mut reply_status = StatusCode::ACCEPTED;
 
