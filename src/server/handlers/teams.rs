@@ -2,16 +2,17 @@ use axum::{
     extract::{Query, State}, 
     http::StatusCode, 
     response::Result, 
-    Json,
+    body::Bytes,
 };
 use serde::Deserialize;
+use tracing::error;
 
 use crate::{
     jira_api::{comment::JiraComment, issue::Issue}, 
     ms_graph_api::message::MsGraphMessage, server::server::AppStateShared, 
 };
 
-use super::helpers::{self, log_to_file};
+use super::helpers;
 
 
 #[derive(Debug, Deserialize)]
@@ -27,25 +28,29 @@ pub(crate) struct RequestValue {
     pub(crate) client_state: String,
     pub(crate) resource: String,
 }
-
 pub(crate) async fn handler(
     Query(query): Query<helpers::ValidationTokenQuery>, 
     State(state_shared): State<AppStateShared>,
-    req: Option<Json<Request>>, 
+    body: Bytes,
 ) -> Result<(StatusCode, String)> {
-    if let Some(Json(request)) = req {
+    if !body.is_empty() {
+        let request = serde_json::from_slice::<Request>(&body).map_err(|e| {
+            error!("Failed to parse request body: {}", e);
+            (StatusCode::BAD_REQUEST, e.to_string())
+        })?;
+
         tokio::task::spawn(
-            async move { 
+            async move {
                 if let Err(e) = handle_teams_request(request, state_shared).await {
-                    log_to_file("teams", &e.to_string()).await;
+                    error!("Failed to handle teams request: {}", e);
                     Err(e)
                 } else {
                     Ok(())
                 }
             }
         );
-    };
-    
+    }
+
     let response = query.validation_token.clone().unwrap_or_default();
 
     Ok((StatusCode::OK, response))

@@ -1,17 +1,18 @@
 use anyhow::Context as _;
 use axum::{
-    extract::{Query, State}, http::StatusCode, response::{
+    body::Bytes, extract::{Query, State}, http::StatusCode, response::{
         IntoResponse, 
         Result
-    }, Json
+    },
 };
 use serde::Deserialize;
+use tracing::error;
 
 use crate::{
     ms_graph_api::model::MSGraphAPI, server::{error::Error, server::AppStateShared}
 };
 
-use super::helpers::{self, log_to_file};
+use super::helpers;
 
 
 #[derive(Debug, Deserialize)]
@@ -32,13 +33,18 @@ pub(crate) struct RequestValue {
 pub(crate) async fn handler(
     Query(query): Query<helpers::ValidationTokenQuery>, 
     State(state_shared): State<AppStateShared>,
-    req: Option<Json<Request>>
+    body: Bytes,
 ) -> Result<impl IntoResponse> {
     let mut reply_status = StatusCode::ACCEPTED;
 
-    if let Some(Json(request)) = req {
+    if !body.is_empty() {
+        let request = serde_json::from_slice::<Request>(&body).map_err(|e| {
+            error!("Failed to parse request body: {}", e);
+            (StatusCode::BAD_REQUEST, e.to_string())
+        })?;
+        
         if let Err(e) = parse_handler(&state_shared.microsoft, request).await {
-            log_to_file("teams_lifecycle", &e.to_string()).await;
+            error!("Failed to handle teams lifecycle request: {}", e);
             return Err(Error::c500(e).into());
         }
     };
