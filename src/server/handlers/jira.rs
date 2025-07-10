@@ -233,15 +233,15 @@ async fn parse_issue(payload: Bytes, graph_api: &MSGraphAPI) -> Result<()> {
 async fn handle_jira_request(webhook_event: String, payload: Bytes, state_shared: AppStateShared) -> anyhow::Result<()> {
     let result = match webhook_event.as_str() {
         "comment_created" | "comment_updated" => { 
-                parse_comment(payload, state_shared).await.context("Failed to parse comment")
+                parse_comment(payload.clone(), state_shared).await.context("Failed to parse comment")
             },
         _ => { 
-                parse_issue(payload, &state_shared.microsoft).await.context("Failed to parse issue")
+                parse_issue(payload.clone(), &state_shared.microsoft).await.context("Failed to parse issue")
             },
     };
 
     if let Err(e) = result {
-        log_to_file("handle jira request", &e.to_string()).await;
+        log_to_file("handle jira request", &format!("Got error:\n{:?}\n\nfor payload:\n{}", e, String::from_utf8_lossy(&payload))).await;
         return Err(e);
     }
 
