@@ -30,11 +30,14 @@ pub(crate) struct RequestValue {
 }
 
 pub(crate) async fn handler(
-    query: Query<helpers::ValidationTokenQuery>, 
+    Query(query): Query<helpers::ValidationTokenQuery>, 
     Extension(jira_api): Extension<JiraAPIShared>,
     State(graph_api): State<MSGraphAPIShared>,
     req: Option<Json<Request>>, 
 ) -> Result<(StatusCode, String)> {
+    println!("Received request: {:?}", req);
+    println!("Query: {:?}", query.validation_token);
+    
     if let Some(Json(request)) = req {
         tokio::task::spawn(
             async move { 

@@ -35,9 +35,6 @@ pub(crate) async fn handler(
     State(graph_api): State<MSGraphAPIShared>,
     req: Option<Json<Request>>
 ) -> Result<impl IntoResponse> {
-    println!("Received request: {:?}", req);
-    println!("Query: {:?}", query.validation_token);
-    
     let mut reply_status = StatusCode::ACCEPTED;
 
     if let Some(Json(request)) = req {
