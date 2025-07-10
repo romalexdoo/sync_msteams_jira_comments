@@ -205,7 +205,7 @@ impl Issue {
         }
 
         let result = jira_api.client
-            .get(format!("{}/rest/api/2/search", jira_api.config.base_url))
+            .get(format!("{}/rest/api/2/search/jql", jira_api.config.base_url))
             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
             .query(&[("maxResults", "1"), ("jql", &jql), ("fields", "*all")])
             .send()

@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::Deserialize;
+use serde_json::Value;
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
@@ -43,17 +44,34 @@ pub(crate) struct MsGraphUser {
 
 impl MsGraphMessage {
     pub(crate) async fn get(client: &Client, resource: &String, access_token: &String) -> Result<Self> {
-        let message = client
+        let reply = client
             .get(format!("https://graph.microsoft.com/v1.0/{resource}"))
             .bearer_auth(access_token)
             .send()
             .await
             .context("Failed to send get message request")?
             .error_for_status()
-            .context("Get message request bad status")?
-            .json::<MsGraphMessage>()
-            .await
-            .context("Parse get message response")?;
+            .context("Get message request bad status")?;
+
+        let message = reply.json::<Value>().await
+            .context("Parse get message response to Value")?;
+
+        println!("Message: {}", message.to_string());
+
+        let message = serde_json::from_value::<MsGraphMessage>(message)
+            .context("Parse get message response to MsGraphMessage")?;
+        
+        // let message = client
+        //     .get(format!("https://graph.microsoft.com/v1.0/{resource}"))
+        //     .bearer_auth(access_token)
+        //     .send()
+        //     .await
+        //     .context("Failed to send get message request")?
+        //     .error_for_status()
+        //     .context("Get message request bad status")?
+        //     .json::<MsGraphMessage>()
+        //     .await
+        //     .context("Parse get message response")?;
 
         Ok(message)
     }
