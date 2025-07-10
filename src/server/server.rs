@@ -3,11 +3,16 @@ use crate::jira_api::model::JiraAPI;
 use crate::server::handlers::{jira, teams, teams_lifecycle, ms_oauth};
 use crate::ms_graph_api::model::MSGraphAPI;
 use anyhow::{ Context, Result };
+use axum::body::{to_bytes, Body};
+use axum::extract::Request;
+use axum::middleware::{self, Next};
+use axum::response::IntoResponse;
 use axum::{
     Router,
     routing::post,
 };
 use axum_server::Handle;
+use tracing::info;
 use std::sync::Arc;
 use std::time::Duration;
 use tower_http::compression::CompressionLayer;
@@ -42,6 +47,7 @@ impl Server {
             .route("/teams", post(teams::handler))
             .route("/teams_lifecycle", post(teams_lifecycle::handler))
             .route("/ms_oauth", post(ms_oauth::handler))
+            .layer(middleware::from_fn(log_request_middleware))
             // Injects MS Graph API.
             .with_state(state_shared)
             // Compression.
@@ -65,4 +71,27 @@ impl Default for Server {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub async fn log_request_middleware(
+    req: Request<Body>,
+    next: Next,
+) -> impl IntoResponse {
+    // Extract and clone the body
+    let (parts, body) = req.into_parts();
+    
+    // Extract query string from parts
+    let query = parts.uri.query().unwrap_or_default();
+    let whole_body = to_bytes(body, usize::MAX).await.unwrap_or_default();
+    let body_str = String::from_utf8_lossy(&whole_body);
+
+    // Log the query and body
+    info!("Incoming request query: {}", query);
+    info!("Incoming request body: {}", body_str);
+
+    // Replace original body with cloned body for the next handler
+    let req = Request::from_parts(parts, Body::from(whole_body));
+
+    // Proceed to the next middleware/handler
+    next.run(req).await
 }

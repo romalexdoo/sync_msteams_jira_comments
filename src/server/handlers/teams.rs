@@ -5,7 +5,6 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use tracing::warn;
 
 use crate::{
     jira_api::{comment::JiraComment, issue::Issue}, 
@@ -34,13 +33,6 @@ pub(crate) async fn handler(
     State(state_shared): State<AppStateShared>,
     req: Option<Json<Request>>, 
 ) -> Result<(StatusCode, String)> {
-    log_to_file("teams", &format!("{:?}", req)).await;
-    log_to_file("teams", &format!("{:?}", query.validation_token)).await;
-    println!("Received request: {:?}", req);
-    println!("Validation token: {:?}", query.validation_token);
-    warn!("Received request: {:?}", req);
-    warn!("Validation token: {:?}", query.validation_token);
-    
     if let Some(Json(request)) = req {
         tokio::task::spawn(
             async move { 

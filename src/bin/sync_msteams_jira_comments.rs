@@ -10,7 +10,7 @@ use std::{sync::Arc, time::Duration};
 #[tokio::main]
 async fn main() -> Result<()> {
     // Tracing.
-    tracing_subscriber::fmt().with_max_level(tracing::Level::WARN).init();
+    tracing_subscriber::fmt().with_max_level(tracing::Level::INFO).init();
     // Read configuration.
     let cfg = Config::init_from_env().context("parse config")?;
     // Create MSGraphAPI instance

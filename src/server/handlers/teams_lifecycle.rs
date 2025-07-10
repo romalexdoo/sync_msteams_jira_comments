@@ -34,9 +34,6 @@ pub(crate) async fn handler(
     State(state_shared): State<AppStateShared>,
     req: Option<Json<Request>>
 ) -> Result<impl IntoResponse> {
-    log_to_file("teams_lifecycle", &format!("{:?}", req)).await;
-    log_to_file("teams_lifecycle", &format!("{:?}", query.validation_token)).await;
-    
     let mut reply_status = StatusCode::ACCEPTED;
 
     if let Some(Json(request)) = req {
