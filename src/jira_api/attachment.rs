@@ -21,9 +21,11 @@ pub(crate) fn add_attachments_urls_to_description(description: &mut String, atta
     let mut updated = false;
 
     for attachment in attachments {
-        if !description.contains(&attachment.content_url) {
-            description.push_str(format!("\n\n[{}|{}]", attachment.name, attachment.content_url).as_str());
-            updated = true;
+        if let (Some(content_url), Some(name)) = (&attachment.content_url, &attachment.name) {
+            if !description.contains(content_url) {
+                description.push_str(format!("\n\n[{}|{}]", name, content_url).as_str());
+                updated = true;
+            }
         }
     }
 

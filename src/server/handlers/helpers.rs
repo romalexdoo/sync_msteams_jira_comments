@@ -6,7 +6,7 @@ use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ValidationTokenQuery {
-    pub(crate) validation_token: String,
+    pub(crate) validation_token: Option<String>,
 }
 
 pub(crate) async fn log_to_file(handler: &str, payload: &str) {

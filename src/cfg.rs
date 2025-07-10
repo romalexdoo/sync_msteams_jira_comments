@@ -8,10 +8,10 @@ use envconfig::Envconfig;
 /// configuration module.
 #[derive(Envconfig, Clone)]
 pub struct Config {
-    #[envconfig(nested = true)]
+    #[envconfig(nested)]
     pub server: ServerConfig,
-    #[envconfig(nested = true)]
+    #[envconfig(nested)]
     pub ms_graph_api: MsGraphApiConfig,
-    #[envconfig(nested = true)]
+    #[envconfig(nested)]
     pub jira: JiraConfig,
 }

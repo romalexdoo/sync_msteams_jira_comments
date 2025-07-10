@@ -31,7 +31,7 @@ pub(crate) struct RequestValue {
 
 
 pub(crate) async fn handler(
-    query: Option<Query<helpers::ValidationTokenQuery>>, 
+    query: Query<helpers::ValidationTokenQuery>, 
     State(graph_api): State<MSGraphAPIShared>,
     req: Option<Json<Request>>
 ) -> Result<impl IntoResponse> {
@@ -44,10 +44,10 @@ pub(crate) async fn handler(
         }
     };
 
-    let response = match query {
-        Some(Query(q)) => {
+    let response = match query.validation_token {
+        Some(ref q) => {
             reply_status = StatusCode::OK;
-            q.validation_token
+            q.clone()
         },
         None => String::new(),
     };

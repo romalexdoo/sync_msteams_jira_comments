@@ -30,7 +30,7 @@ pub(crate) struct RequestValue {
 }
 
 pub(crate) async fn handler(
-    query: Option<Query<helpers::ValidationTokenQuery>>, 
+    query: Query<helpers::ValidationTokenQuery>, 
     Extension(jira_api): Extension<JiraAPIShared>,
     State(graph_api): State<MSGraphAPIShared>,
     req: Option<Json<Request>>, 
@@ -48,10 +48,7 @@ pub(crate) async fn handler(
         );
     };
     
-    let response = match query {
-        Some(Query(q)) => q.validation_token,
-        None => String::new(),
-    };
+    let response = query.validation_token.clone().unwrap_or_default();
 
     Ok((StatusCode::OK, response))
 }

@@ -1,4 +1,3 @@
-use super::headers::{ add_security_headers, static_cache_control };
 use crate::cfg::Config;
 use crate::jira_api::model::JiraAPIShared;
 use crate::server::handlers::{jira, teams, teams_lifecycle, ms_oauth};
@@ -8,12 +7,10 @@ use axum::{
     Extension,
     Router,
     routing::post,
-    middleware,
 };
 use axum_server::Handle;
 use std::sync::Arc;
 use std::time::Duration;
-use tower_cookies::CookieManagerLayer;
 use tower_http::compression::CompressionLayer;
 
 /// API server with some default middleware and endpoints.
@@ -34,21 +31,15 @@ impl Server {
         // Request processing starts from last layer.
         // Response processing starts from first layer.
         let router = Router::new()
-            // Cache control header injection (for static content only).
-            .layer(Extension(static_cache_control()))
             // API router.
             .route("/jira", post(jira::handler))
             .route("/teams", post(teams::handler))
             .route("/teams_lifecycle", post(teams_lifecycle::handler))
             .route("/ms_oauth", post(ms_oauth::handler))
-            // Injects default response headers (https://owasp.org/www-project-secure-headers).
-            .layer(middleware::from_fn(add_security_headers))
             // Injects Jira API.
             .layer(Extension(jira_api))
             // Injects MS Graph API.
             .with_state(graph_api)
-            // Injects cookie manager.
-            .layer(CookieManagerLayer::new())
             // Compression.
             .layer(CompressionLayer::new());
         
