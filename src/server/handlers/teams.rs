@@ -46,12 +46,7 @@ pub(crate) async fn handler(
         );
     };
     
-    // URL decode the validation token if present
-    let response = if let Some(token) = &query.validation_token {
-        urlencoding::decode(token).unwrap_or_else(|_| token.clone().into()).into_owned()
-    } else {
-        String::new()
-    };
+    let response = query.validation_token.clone().unwrap_or_default();
 
     Ok((StatusCode::OK, response))
 }

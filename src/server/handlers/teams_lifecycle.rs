@@ -46,8 +46,7 @@ pub(crate) async fn handler(
     let response = match query.validation_token {
         Some(ref q) => {
             reply_status = StatusCode::OK;
-            // URL decode the validation token
-            urlencoding::decode(q).unwrap_or_else(|_| q.clone().into()).into_owned()
+            q.clone()
         },
         None => String::new(),
     };
