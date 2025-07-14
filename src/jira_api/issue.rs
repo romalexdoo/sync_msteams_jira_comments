@@ -24,7 +24,7 @@ pub(crate) struct Issue {
 #[derive(Clone, Debug, Deserialize)]
 struct IssueFields {
     attachment: Vec<JiraAttachment>,
-    description: String,
+    description: Option<String>,
     assignee: Option<JiraUser>,
     // comment: IssueCommentField,
     status: IssueStatus,
@@ -61,7 +61,7 @@ impl Issue {
     pub(crate) fn get_description(&self) -> Option<String> {
         self.fields
             .as_ref()
-            .map(|f| f.description.clone())
+            .and_then(|f| f.description.clone())
     }
 
     pub(crate) fn get_status(&self) -> Option<String> {
