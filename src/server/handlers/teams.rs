@@ -33,6 +33,8 @@ pub(crate) async fn handler(
     State(state_shared): State<AppStateShared>,
     body: Bytes,
 ) -> Result<(StatusCode, String)> {
+    tracing::debug!("Received Teams request");
+
     if !body.is_empty() {
         let request = serde_json::from_slice::<Request>(&body).map_err(|e| {
             error!("Failed to parse request body: {}", e);
