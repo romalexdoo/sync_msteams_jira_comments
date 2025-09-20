@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-adf2html = "0.2.2"
+adf2html = "1.0.0"
 anyhow = "1.0.98"
 axum = { version = "0.8.4", features = ["macros"] }
 axum-server = { version = "0.7.2", features = ["tls-rustls"] }

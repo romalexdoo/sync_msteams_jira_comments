@@ -161,7 +161,10 @@ async fn parse_comment(payload: Bytes, state_shared: AppStateShared) -> Result<(
         let mut body = comment.body.clone();
 
         body.replace_media_urls(&state_shared.jira.config.base_url, &comment.rendered_body);
-        let reply_body = body.to_html(Some(Moscow));
+
+        let comment_url = format!("https://plnew.atlassian.net/browse/{}?focusedCommentId={}", issue.get_key(), request.comment.id);
+
+        let reply_body = body.to_html(Some(Moscow), &comment_url);
 
         if let Some(reply_id) = comment.get_reply_id() {
             state_shared.microsoft
