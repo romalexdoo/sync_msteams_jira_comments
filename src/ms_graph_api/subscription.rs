@@ -110,7 +110,7 @@ println!("6");
         };
 
         client
-            .post(format!("https://graph.microsoft.com/v1.0/subscriptions/{}/reauthorize", subsciption_id))
+            .patch(format!("https://graph.microsoft.com/v1.0/subscriptions/{}", subsciption_id))
             .bearer_auth(access_token)
             .json(&req)
             .send()
