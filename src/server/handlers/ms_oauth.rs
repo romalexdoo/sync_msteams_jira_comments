@@ -4,7 +4,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::server::server::AppStateShared;
+use crate::server::AppStateShared;
 
 
 #[derive(Debug, Deserialize)]

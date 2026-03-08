@@ -30,7 +30,7 @@ pub(crate) struct JiraCommentPropertyValue {
 }
 
 impl JiraCommentV3 {
-    // pub(crate) async fn find(jira_api: &JiraAPIShared, issue_id: &String, reply_id: &String) -> Result<Option<Self>> {
+    // pub(crate) async fn find(jira_api: &JiraAPIShared, issue_id: &str, reply_id: &str) -> Result<Option<Self>> {
 
     //     #[derive(Deserialize)]
     //     #[serde(rename_all = "camelCase")]
@@ -77,14 +77,14 @@ impl JiraCommentV3 {
             .properties
             .as_ref()?
             .iter()
-            .find(|p| p.key == PROPERTY_KEY.to_string())?
+            .find(|p| p.key == PROPERTY_KEY)?
             .value
             .as_ref()?
             .teams_id
             .clone()
     }
 
-    pub(crate) async fn add_reply_id(&self, jira_api: &JiraAPI, reply_id: &String) -> Result<()> {
+    pub(crate) async fn add_reply_id(&self, jira_api: &JiraAPI, reply_id: &str) -> Result<()> {
         let payload = json!({
             "teams_id": reply_id
         });
@@ -102,9 +102,8 @@ impl JiraCommentV3 {
         Ok(())
     }
 
-    pub(crate) async fn get(jira_api: &JiraAPI, issue_id: &String, comment_id: &String) -> Result<Self> {
-        Ok(
-            jira_api.client
+    pub(crate) async fn get(jira_api: &JiraAPI, issue_id: &str, comment_id: &str) -> Result<Self> {
+        jira_api.client
                 .get(format!("{}/rest/api/3/issue/{}/comment/{}", jira_api.config.base_url, issue_id, comment_id))
                 .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
                 .query(&[("expand", "properties,renderedBody")])
@@ -115,7 +114,6 @@ impl JiraCommentV3 {
                 .context("Get comments request bad status")?
                 .json::<Self>()
                 .await
-                .context("Parse get comments response")?
-        )
+                .context("Parse get comments response")
     }
 }

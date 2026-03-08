@@ -9,7 +9,7 @@ use tracing::error;
 
 use crate::{
     jira_api::{comment::JiraComment, issue::Issue}, 
-    ms_graph_api::message::MsGraphMessage, server::server::AppStateShared, 
+    ms_graph_api::message::MsGraphMessage, server::AppStateShared, 
 };
 
 use super::helpers;

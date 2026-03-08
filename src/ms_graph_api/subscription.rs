@@ -44,24 +44,21 @@ impl Subscription {
         Self { subscription_id: Uuid::nil(), subscription_secret: Uuid::nil() }
     }
 
-    pub async fn init(&mut self, client: &Client, config: &Config, access_token: &String, repeated: bool) -> Result<()> {
+    pub async fn init(&mut self, client: &Client, config: &Config, access_token: &str, repeated: bool) -> Result<()> {
         let subscription_secret = Uuid::new_v4();
-println!("1");
-println!("{access_token}");
-        let response = add_subscription_response(config, client, access_token, &subscription_secret).await?;
-println!("2: {}", response.status());
+        let response = add_subscription_response(config, client, access_token, subscription_secret).await?;
+
         if response.status().is_success() {
             self.subscription_secret = subscription_secret;
             self.subscription_id = response.json::<NewSubsciptionResponse>().await.context("Failed to retrieve subscription ID")?.id;
         } else if response.status() == StatusCode::FORBIDDEN {
-println!("3");
             if repeated {
                 bail!("Failed to kill active subscription");
             } else {
                 kill_active_subscription(client, access_token).await?;
-println!("4");                
-                let response = add_subscription_response(config, client, access_token, &subscription_secret).await?;
-println!("5");
+
+                let response = add_subscription_response(config, client, access_token, subscription_secret).await?;
+
                 ensure!(response.status().is_success(), response.text().await?);
 
                 self.subscription_secret = subscription_secret;
@@ -70,9 +67,8 @@ println!("5");
         } else {
             bail!(response.text().await?)
         }
-println!("6");
+
         let auth_url = format!("https://login.microsoftonline.com/{}/oauth2/v2.0/authorize?client_id={}&scope=offline_access%20ChannelMessage.Send%20ChannelMessage.ReadWrite&response_type=code&redirect_uri={}&response_mode=form_post&state={}", config.tenant_id, config.client_id, config.oauth_url, subscription_secret);
-        println!("{auth_url}");
         
         let content = format!("Please, go to email below<BR><a href=\"{}\">{}</a>", auth_url, auth_url);
         
@@ -104,7 +100,7 @@ println!("6");
         Ok(())
     }
 
-    pub(crate) async fn renew(&mut self, client: &Client, access_token: &String, subsciption_id: &String) -> Result<()> {
+    pub(crate) async fn renew(&mut self, client: &Client, access_token: &str, subsciption_id: &str) -> Result<()> {
         let req = RenewSubsciptionRequest {
             expiration_date_time: Utc::now() + chrono::Duration::try_hours(3).unwrap(),
         };
@@ -122,14 +118,14 @@ println!("6");
         Ok(())
     }
 
-    pub(crate) fn check_client_secret(&self, secret: &String) -> Result<()> {
-        let secret_uuid = Uuid::try_parse(secret.as_str())?;
+    pub(crate) fn check_client_secret(&self, secret: &str) -> Result<()> {
+        let secret_uuid = Uuid::try_parse(secret)?;
         ensure!(secret_uuid == self.subscription_secret, "Incorrect secret");
         Ok(())
     }
 }
 
-async fn kill_active_subscription(client: &Client, access_token: &String) -> Result<()> {
+async fn kill_active_subscription(client: &Client, access_token: &str) -> Result<()> {
     let response = client
         .get("https://graph.microsoft.com/v1.0/subscriptions/")
         .bearer_auth(access_token)
@@ -137,36 +133,32 @@ async fn kill_active_subscription(client: &Client, access_token: &String) -> Res
         .await
         .context("Failed to send get subscription request")?;
 
-    if response.status().is_success() {
-        if let Ok(s) = response.json::<ActiveSubsciptionResponse>().await {
-            if let Some(r) = s.value.first() {
-                client
-                    .delete(format!("https://graph.microsoft.com/v1.0/subscriptions/{}", r.id))
-                    .bearer_auth(access_token)
-                    .send()
-                    .await
-                    .context("Failed to send delete subscription request")?
-                    .error_for_status()
-                    .context("Delete subscription request bad status")?;
-            }
-        }
+    if response.status().is_success()
+        && let Ok(s) = response.json::<ActiveSubsciptionResponse>().await
+        && let Some(r) = s.value.first() 
+    {
+        client
+            .delete(format!("https://graph.microsoft.com/v1.0/subscriptions/{}", r.id))
+            .bearer_auth(access_token)
+            .send()
+            .await
+            .context("Failed to send delete subscription request")?
+            .error_for_status()
+            .context("Delete subscription request bad status")?;
     }
 
     Ok(())
 }
 
-async fn add_subscription_response(config: &Config, client: &Client, access_token: &String, subscription_secret: &Uuid) -> Result<Response> {
+async fn add_subscription_response(config: &Config, client: &Client, access_token: &str, subscription_secret: Uuid) -> Result<Response> {
     let req = NewSubsciptionRequest {
         change_type: String::from("created,updated"),
         notification_url: config.notification_url.clone(),
         lifecycle_notification_url: config.lifecycle_notification_url.clone(),
         resource: format!("/teams/{}/channels/{}/messages", config.group_id, config.channel_id),
         expiration_date_time: Utc::now() + chrono::Duration::try_hours(3).unwrap(),
-        client_state: subscription_secret.clone(),
+        client_state: subscription_secret,
     };
-
-println!("{access_token}");
-println!("{:#?}", req);
 
     client
         .post("https://graph.microsoft.com/v1.0/subscriptions")

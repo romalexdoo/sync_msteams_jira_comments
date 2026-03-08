@@ -21,11 +21,11 @@ pub(crate) fn add_attachments_urls_to_description(description: &mut String, atta
     let mut updated = false;
 
     for attachment in attachments {
-        if let (Some(content_url), Some(name)) = (&attachment.content_url, &attachment.name) {
-            if !description.contains(content_url) {
-                description.push_str(format!("\n\n[{}|{}]", name, content_url).as_str());
-                updated = true;
-            }
+        if let (Some(content_url), Some(name)) = (&attachment.content_url, &attachment.name)
+            && !description.contains(content_url) 
+        {
+            description.push_str(format!("\n\n[{}|{}]", name, content_url).as_str());
+            updated = true;
         }
     }
 
@@ -34,7 +34,7 @@ pub(crate) fn add_attachments_urls_to_description(description: &mut String, atta
 
 pub(crate) async fn replace_images_in_description(
     description: &mut String, 
-    graph_api_token: &String, 
+    graph_api_token: &str, 
 ) -> Result<Vec<GraphApiImage>> {
     let url_regex = Regex::new(r#"https://graph\.microsoft\.com/v1\.0/[^\s\|\]\\\"]*"#).unwrap();
     let mut urls: Vec<_> = url_regex.find_iter(description)
@@ -43,7 +43,7 @@ pub(crate) async fn replace_images_in_description(
 
     let mut result: Vec<GraphApiImage> = Vec::new();
 
-    if urls.len() > 0 {
+    if !urls.is_empty() {
         urls.sort();
         urls.dedup();
         
@@ -67,17 +67,16 @@ pub(crate) async fn replace_attachments(
     let old_attachments = issue.get_attachments();
 
     for old_image_name in old_image_names {
-        if !new_images.iter().any(|i| i.name == *old_image_name) {
-            if let Some(attachments) = old_attachments.as_ref() {
-                if let Some(attachment) = attachments.iter().find(|a| a.filename == *old_image_name) {
-                    let _ = delete_attachment(jira_api, &attachment.id).await;
-                }
-            }
+        if !new_images.iter().any(|i| i.name == *old_image_name)
+            && let Some(attachments) = old_attachments.as_ref()
+            && let Some(attachment) = attachments.iter().find(|a| a.filename == *old_image_name) 
+        {
+            let _ = delete_attachment(jira_api, &attachment.id).await;
         }
     }
 
     for image in new_images {
-        if old_attachments.as_ref().map_or(true, |v| !v.iter().any(|a| a.filename == image.name)) {
+        if old_attachments.as_ref().is_none_or(|v| !v.iter().any(|a| a.filename == image.name)) {
             let _ = upload_image(jira_api, issue, image).await;
         }
     }
@@ -107,7 +106,7 @@ async fn upload_image(jira_api: &JiraAPI, issue: &Issue, image: &GraphApiImage) 
 }
 
 
-fn replace_img_tag_for_jira(text: &String, search_url: &String, replace_with: &String) -> String {
+fn replace_img_tag_for_jira(text: &str, search_url: &str, replace_with: &str) -> String {
     // Escaping the target URL to safely insert it into the regex pattern
     let escaped_url = regex::escape(search_url);
 
@@ -123,7 +122,7 @@ fn replace_img_tag_for_jira(text: &String, search_url: &String, replace_with: &S
     re.replace_all(text, format!("\n\n!{}!\n\n", replace_with)).into_owned()
 }
 
-async fn delete_attachment(jira_api: &JiraAPI, attachment_id: &String) -> Result<()> {
+async fn delete_attachment(jira_api: &JiraAPI, attachment_id: &str) -> Result<()> {
     jira_api.client
         .delete(format!("{}/rest/api/2/attachment/{}", jira_api.config.base_url, attachment_id))
         .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
@@ -136,8 +135,8 @@ async fn delete_attachment(jira_api: &JiraAPI, attachment_id: &String) -> Result
     Ok(())
 }
 
-pub(crate) fn find_old_attached_images(description: &String) -> Vec<String> {
-    let pattern_str = format!("\n\n!+([^!]+)!\n\n");
+pub(crate) fn find_old_attached_images(description: &str) -> Vec<String> {
+    let pattern_str = String::from("\n\n!+([^!]+)!\n\n");
     let pattern = Regex::new(&pattern_str).unwrap();
     
     pattern

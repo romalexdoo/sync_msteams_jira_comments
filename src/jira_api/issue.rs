@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
 
-use crate::{jira_api::model::JiraAPI, ms_graph_api::message::TeamsAttachment, server::server::AppStateShared};
+use crate::{jira_api::model::JiraAPI, ms_graph_api::message::TeamsAttachment, server::AppStateShared};
 
 use super::{
     attachment::{add_attachments_urls_to_description, find_old_attached_images, replace_attachments, replace_images_in_description, JiraAttachment}, 
@@ -73,7 +73,7 @@ impl Issue {
     pub(crate) fn final_status(&self) -> bool {
         self.fields
             .as_ref()
-            .map_or(false, |f| f.status.is_final())
+            .is_some_and(|f| f.status.is_final())
     }
 
     pub(crate) fn get_teams_link(&self) -> Option<String> {
@@ -87,26 +87,25 @@ impl Issue {
             .as_ref()
             .and_then(|f| 
                 f.assignee.as_ref().and_then(|a| 
-                    a.display_name.as_ref().map(|dn| 
-                        dn.clone()
-                    )
+                    a.display_name.clone()
                 )
             )
     }
     
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn create_or_update (
         state_shared: AppStateShared,
-        summary: &String, 
-        description: &String, 
-        reporter_email: &String, 
+        summary: &str, 
+        description: &str, 
+        reporter_email: &str, 
         attachments: &Vec<TeamsAttachment>,
-        graph_api_token: &String,
-        message_url: &String,
-        message_id: &String,
+        graph_api_token: &str,
+        message_url: &str,
+        message_id: &str,
     ) -> Result<(Self, bool)> {
-        let mut summary = summary.clone();
+        let mut summary = summary.to_string();
     
-        if summary.len() == 0 {
+        if summary.is_empty() {
             summary = format!("New issue from {reporter_email}");
         }
     
@@ -192,8 +191,8 @@ impl Issue {
 
     pub(crate) async fn find(
         state_shared: AppStateShared, 
-        teams_url: &String,
-        message_id: &String,
+        teams_url: &str,
+        message_id: &str,
     ) -> Result<Option<Self>> {
         let jql = format!("project = \"{}\" AND \"{}\" = \"{}\"", state_shared.jira.config.project_key, state_shared.jira.config.msteams_link_field_jql_name, teams_url);
 
@@ -227,7 +226,7 @@ impl Issue {
 
         let issue = response.issues.pop().unwrap();
 
-        if issue.clone().fields.map_or(false, |i| i.status.is_final()) {
+        if issue.clone().fields.is_some_and(|i| i.status.is_final()) {
             state_shared.microsoft
                 .reply_to_issue(message_id, &String::from("Извините, но данная задача закрыта. Просим вас завести новую, иначе мы можем пропустить это сообщение"))
                 .await?;
@@ -238,7 +237,7 @@ impl Issue {
 
     pub(crate) async fn get_issue(
         jira_api: &JiraAPI, 
-        issue_id: &String,
+        issue_id: &str,
     ) -> Result<Self> {
         let issue = jira_api.client
             .get(format!("{}/rest/api/2/issue/{}", jira_api.config.base_url, issue_id))

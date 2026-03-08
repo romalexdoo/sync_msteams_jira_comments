@@ -56,7 +56,7 @@ impl MSGraphAPI {
         Ok(graph_api)
     }
 
-    pub(crate) async fn get_user_email(&self, access_token: &String, user_id: Uuid) -> Result<String> {
+    pub(crate) async fn get_user_email(&self, access_token: &str, user_id: Uuid) -> Result<String> {
         let user_mail = self
             .users
             .read()
@@ -67,7 +67,7 @@ impl MSGraphAPI {
         
         if user_mail.is_none() {
             let new_user = self.client
-                .get(format!("https://graph.microsoft.com/v1.0/users/{}", user_id.to_string()))
+                .get(format!("https://graph.microsoft.com/v1.0/users/{}", user_id))
                 .bearer_auth(access_token)
                 .send()
                 .await
@@ -121,7 +121,7 @@ impl MSGraphAPI {
         }
     }
 
-    pub(crate) async fn reply_to_issue(&self, message_id: &String, reply_body: &String) -> Result<MsGraphMessage> {
+    pub(crate) async fn reply_to_issue(&self, message_id: &str, reply_body: &str) -> Result<MsGraphMessage> {
         let token = self.granted_token.read().await.get()?;
 
         let payload = json!(
@@ -149,7 +149,7 @@ impl MSGraphAPI {
         Ok(response)
     }
 
-    pub(crate) async fn edit_reply(&self, message_id: &String, reply_id: &String, reply_body: &String) -> Result<()> {
+    pub(crate) async fn edit_reply(&self, message_id: &str, reply_id: &str, reply_body: &str) -> Result<()> {
         let token = self.granted_token.read().await.get()?;
 
         let payload = json!(

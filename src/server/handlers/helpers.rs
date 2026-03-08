@@ -15,12 +15,12 @@ pub(crate) async fn log_to_file(handler: &str, payload: &str) {
         .append(true)
         .open("test.txt")
         .await {
-            let data = format!("{}\t{}\t{}\n", chrono::Local::now().format("%d.%m.%Y %H:%M:%S").to_string(), handler, payload);
+            let data = format!("{}\t{}\t{}\n", chrono::Local::now().format("%d.%m.%Y %H:%M:%S"), handler, payload);
             let _ = file.write_all(data.as_bytes()).await;
     };
 }
 
-pub(crate) fn get_message_id_and_reply_id(resource: &String) -> (Option<String>, Option<String>) {
+pub(crate) fn get_message_id_and_reply_id(resource: &str) -> (Option<String>, Option<String>) {
     let mut message_id = None;
     let mut reply_id = None;
     for part in resource.rsplit("/") {

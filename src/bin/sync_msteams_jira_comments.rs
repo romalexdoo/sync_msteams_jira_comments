@@ -1,5 +1,5 @@
 use sync_msteams_jira_comments::{
-    cfg::Config, jira_api::model::JiraAPI, ms_graph_api::model::MSGraphAPI, server::server::{AppState, Server}, utils::os_signal_or_completion_of
+    cfg::Config, jira_api::model::JiraAPI, ms_graph_api::model::MSGraphAPI, server::{AppState, Server}, utils::os_signal_or_completion_of
 };
 
 use anyhow::{ Context, Result };

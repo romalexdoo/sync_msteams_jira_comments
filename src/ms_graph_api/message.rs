@@ -42,7 +42,7 @@ pub(crate) struct MsGraphUser {
 }
 
 impl MsGraphMessage {
-    pub(crate) async fn get(client: &Client, resource: &String, access_token: &String) -> Result<Self> {
+    pub(crate) async fn get(client: &Client, resource: &str, access_token: &str) -> Result<Self> {
         let message = client
             .get(format!("https://graph.microsoft.com/v1.0/{resource}"))
             .bearer_auth(access_token)

@@ -33,16 +33,18 @@ impl JiraAPI {
         Ok(jira_api)
     }
 
-    pub(crate) async fn find_user_by_id(&self, id: &String) -> Result<JiraUser> {
-        let user = self
+    pub(crate) async fn find_user_by_id(&self, id: &str) -> Result<JiraUser> {
+        let maybe_user = self
             .users
             .read()
             .await
             .iter()
             .find(|u| u.account_id == *id)
-            .map(|u| u.clone());
+            .cloned();
 
-        if user.is_none() {
+        if let Some(user) = maybe_user {
+            Ok(user)
+        } else {
             let new_user = self.get_user_from_api_by_id(id).await?;
 
             self
@@ -52,12 +54,10 @@ impl JiraAPI {
                 .push(new_user.clone());
 
             Ok(new_user)
-        } else {
-            Ok(user.unwrap())
         }
     }
 
-    async fn get_user_from_api_by_id(&self, id: &String) -> Result<JiraUser> {
+    async fn get_user_from_api_by_id(&self, id: &str) -> Result<JiraUser> {
         let result = self.client
             .get(format!("{}/rest/api/2/user", self.config.base_url))
             .basic_auth(&self.config.user, Some(&self.config.token))
@@ -74,14 +74,14 @@ impl JiraAPI {
         Ok(result)
     }
 
-    pub(crate) async fn get_jira_user_by_email(&self, email: &String) -> Result<Option<JiraUser>> {
+    pub(crate) async fn get_jira_user_by_email(&self, email: &str) -> Result<Option<JiraUser>> {
         let user = self
             .users
             .read()
             .await
             .iter()
-            .find(|u| u.email_address.as_ref().map_or(false, |e| e.to_lowercase() == email.to_lowercase()))
-            .map(|u| u.clone());
+            .find(|u| u.email_address.as_ref().is_some_and(|e| e.to_lowercase() == email.to_lowercase()))
+            .cloned();
 
         if user.is_some() {
             Ok(user)
@@ -100,7 +100,7 @@ impl JiraAPI {
         }
     }
 
-    async fn get_user_from_api_by_email(&self, email: &String) -> Result<Option<JiraUser>> {
+    async fn get_user_from_api_by_email(&self, email: &str) -> Result<Option<JiraUser>> {
         let mut page = 0;
         
         loop {
@@ -123,14 +123,14 @@ impl JiraAPI {
                 .await
                 .context("Parse get reporter response")?;
             
-            if users.len() == 0 {
+            if users.is_empty() {
                 break;
             }
     
             let reporter = users
                 .iter()
-                .find(|u| u.email_address.clone().unwrap_or_default().to_lowercase() == email.to_lowercase())
-                .map(|u| u.clone());
+                .find(|u| u.email_address.as_ref().is_some_and(|e| e.to_lowercase() == email.to_lowercase()))
+                .cloned();
     
             if reporter.is_some() {
                 return Ok(reporter);

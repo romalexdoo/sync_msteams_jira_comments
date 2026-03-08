@@ -31,7 +31,7 @@ impl ApplicationToken {
         }
         
         let token = client
-            .post(&format!("https://login.microsoftonline.com/{}/oauth2/v2.0/token", config.tenant_id))
+            .post(format!("https://login.microsoftonline.com/{}/oauth2/v2.0/token", config.tenant_id))
             .form(&[
                 ("scope", "https://graph.microsoft.com/.default"),
                 ("grant_type", "client_credentials"),

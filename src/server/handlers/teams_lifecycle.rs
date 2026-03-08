@@ -9,7 +9,7 @@ use serde::Deserialize;
 use tracing::error;
 
 use crate::{
-    ms_graph_api::model::MSGraphAPI, server::{error::Error, server::AppStateShared}
+    ms_graph_api::model::MSGraphAPI, server::{error::Error, AppStateShared}
 };
 
 use super::helpers;

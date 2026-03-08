@@ -41,7 +41,7 @@ impl GrantedToken {
     async fn set(&mut self, client: &Client, config: &Config, form: &[(&str, &str)]) -> Result<(String, u64)> {
 
         let token = client
-            .post(&format!("https://login.microsoftonline.com/{}/oauth2/v2.0/token", config.tenant_id))
+            .post(format!("https://login.microsoftonline.com/{}/oauth2/v2.0/token", config.tenant_id))
             .form(form)
             .send()
             .await

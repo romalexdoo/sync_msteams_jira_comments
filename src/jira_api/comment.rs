@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::{jira_api::model::JiraAPI, ms_graph_api::message::TeamsAttachment, server::server::AppStateShared};
+use crate::{jira_api::model::JiraAPI, ms_graph_api::message::TeamsAttachment, server::AppStateShared};
 
 use super::{
     attachment::{add_attachments_urls_to_description, find_old_attached_images, replace_attachments, replace_images_in_description}, 
@@ -34,15 +34,16 @@ pub(crate) struct JiraCommentPropertyValue {
 }
 
 impl JiraComment {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn create_or_update (
         state_shared: AppStateShared,
-        description: &String, 
-        author_email: &String, 
+        description: &str, 
+        author_email: &str, 
         attachments: &Vec<TeamsAttachment>,
-        graph_api_token: &String,
-        message_url: &String,
-        reply_id: &String,
-        message_id: &String,
+        graph_api_token: &str,
+        message_url: &str,
+        reply_id: &str,
+        message_id: &str,
     ) -> Result<Self> {
         // let description = htmltoadf::convert_html_str_to_adf_str(description.clone());
         // let description_json: Value = serde_json::from_str(description.as_str()).context("Failed to parse description JSON")?;
@@ -55,7 +56,7 @@ impl JiraComment {
         let author_id = state_shared.jira
             .get_jira_user_by_email(author_email)
             .await?
-            .map_or(author_email.clone(), |u| u.account_id.clone());
+            .map_or(author_email.to_string(), |u| u.account_id.clone());
         
         description_v2 = format!("On behalf of [~accountid:{}]:\n\n{}", author_id, description_v2);
     
@@ -72,43 +73,42 @@ impl JiraComment {
             ]
         });
 
-        let issue = match Issue::find(state_shared.clone(), &message_url, message_id).await? {
+        let issue = match Issue::find(state_shared.clone(), message_url, message_id).await? {
             Some(i) => i,
             None => bail!("Issue not found"),
         };
 
-        let mut comment = JiraComment::find(&state_shared.jira, &issue.get_id(), reply_id).await?;
+        let comment = JiraComment::find(&state_shared.jira, &issue.get_id(), reply_id).await?;
         let comment_body = comment.as_ref().map(|com| com.body.clone()).unwrap_or_default();
     
-        if comment.is_none() {
-            comment = Some(
-                    state_shared.jira.client
-                        .post(format!("{}/rest/api/2/issue/{}/comment", state_shared.jira.config.base_url, issue.get_id()))
-                        .basic_auth(&state_shared.jira.config.user, Some(&state_shared.jira.config.token))
-                        .json(&payload)
-                        .send()
-                        .await
-                        .context("Failed to send create comment request")?
-                        .error_for_status()
-                        .context("Create comment request bad status")?
-                        .json::<JiraComment>()
-                        .await
-                        .context("Parse create comment response")?
-                );
-        } else {
-            let comment = comment.as_mut().unwrap();
-            comment.update(&state_shared.jira, &issue.get_id(), &payload).await?;
-        }
-    
-        let comment = comment.unwrap();
-    
+        let comment = match comment {
+            Some(c) => {
+                c.update(&state_shared.jira, &issue.get_id(), &payload).await?;
+                c
+            },
+            None => {
+                 state_shared.jira.client
+                    .post(format!("{}/rest/api/2/issue/{}/comment", state_shared.jira.config.base_url, issue.get_id()))
+                    .basic_auth(&state_shared.jira.config.user, Some(&state_shared.jira.config.token))
+                    .json(&payload)
+                    .send()
+                    .await
+                    .context("Failed to send create comment request")?
+                    .error_for_status()
+                    .context("Create comment request bad status")?
+                    .json::<JiraComment>()
+                    .await
+                    .context("Parse create comment response")?
+            }
+        };
+            
         let old_image_names = find_old_attached_images(&comment_body);
         replace_attachments(&state_shared.jira, &issue, &old_image_names, &images).await?;
     
         Ok(comment)
     }
 
-    pub(crate) async fn find(jira_api: &JiraAPI, issue_id: &String, reply_id: &String) -> Result<Option<Self>> {
+    pub(crate) async fn find(jira_api: &JiraAPI, issue_id: &str, reply_id: &str) -> Result<Option<Self>> {
 
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -132,25 +132,23 @@ impl JiraComment {
         let result = search_response.comments
             .into_iter()
             .find(|r| {
-                    let value = r.properties
+                    let value: &str = r.properties
                         .as_ref()
-                        .map(|properties| 
+                        .and_then(|properties| 
                                 properties
                                     .iter()
-                                    .find(|p| p.key == String::from("teams_id"))
-                                    .map(|p| p.value.as_ref().map(|v| v.teams_id.as_ref()))
-                            )
-                        .flatten()
+                                    .find(|p| p.key == "teams_id")
+                                    .map(|p| p.value.as_ref().map(|v| v.teams_id.as_ref())))
                         .flatten()
                         .unwrap_or_default();
-                    value == *reply_id
+                    value == reply_id
                 }
             );
 
         Ok(result)
     }
 
-    pub(crate) async fn update(&self, jira_api: &JiraAPI, issue_id: &String, payload: &Value) -> Result<()> {
+    pub(crate) async fn update(&self, jira_api: &JiraAPI, issue_id: &str, payload: &Value) -> Result<()> {
         jira_api.client
             .put(format!("{}/rest/api/2/issue/{}/comment/{}", jira_api.config.base_url, issue_id, self.id))
             .basic_auth(&jira_api.config.user, Some(&jira_api.config.token))
@@ -178,7 +176,7 @@ impl JiraComment {
     //         )
     // }
 
-    // pub(crate) async fn add_reply_id(&self, jira_api: &JiraAPIShared, reply_id: &String) -> Result<()> {
+    // pub(crate) async fn add_reply_id(&self, jira_api: &JiraAPIShared, reply_id: &str) -> Result<()> {
     //     let payload = json!({
     //         "teams_id": reply_id
     //     });
@@ -196,7 +194,7 @@ impl JiraComment {
     //     Ok(())
     // }
 
-    // pub(crate) async fn get(jira_api: &JiraAPIShared, issue_id: &String, comment_id: &String) -> Result<Self> {
+    // pub(crate) async fn get(jira_api: &JiraAPIShared, issue_id: &str, comment_id: &str) -> Result<Self> {
     //     Ok(
     //         jira_api.client
     //             .get(format!("{}/rest/api/2/issue/{}/comment/{}", jira_api.config.base_url, issue_id, comment_id))

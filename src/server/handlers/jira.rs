@@ -15,7 +15,7 @@ use crate::jira_api::comment_v3::JiraCommentV3;
 use crate::jira_api::issue::Issue;
 use crate::ms_graph_api::model::MSGraphAPI;
 use crate::server::error::Error as ApiError;
-use crate::server::server::AppStateShared;
+use crate::server::AppStateShared;
 
 use super::helpers::log_to_file;
 
@@ -67,7 +67,7 @@ pub(crate) async fn handler(
         Ok(()) => Ok(StatusCode::OK),
         Err(e) => {
             log_to_file("jira", &e.to_string()).await;
-            return Err(ApiError::c500(e));
+            Err(ApiError::c500(e))
         }
     }
 }
@@ -87,13 +87,11 @@ async fn parse_handler(
     let json_payload = serde_json::from_slice::<Value>(&payload)
         .context("Failed to deserialize payload")?;
 
-    let webhook_event = format!("{}",
-            &json_payload
-                .get("webhookEvent")
-                .and_then(|t| t.as_str())
-                .unwrap_or_default()
-                .to_string()
-        );
+    let webhook_event = json_payload
+        .get("webhookEvent")
+        .and_then(|t| t.as_str())
+        .unwrap_or_default()
+        .to_string();
 
     tokio::task::spawn(async move { 
         handle_jira_request(webhook_event, payload, state_shared).await 
@@ -102,9 +100,9 @@ async fn parse_handler(
     Ok(())
 }
 
-fn validate_signature(payload: &Bytes, secret: &String, signature: &Signature) -> Result<()> {
+fn validate_signature(payload: &Bytes, secret: &str, signature: &Signature) -> Result<()> {
     ensure!(
-        signature.method == "sha256".to_string(),
+        signature.method == "sha256",
         "Wrong method, expected: sha256, got: {}",
         signature.method
     );
@@ -125,7 +123,7 @@ fn extract_message_id_from_url(url: String) -> Option<String> {
 }
 
 fn get_signature_from_headers(headers: HeaderMap) -> Result<Signature> {
-    ensure!(headers.len() > 0, "Headers not present in request");
+    ensure!(!headers.is_empty(), "Headers not present in request");
 
     let header = headers
         .get(HeaderName::from_static("x-hub-signature"))
@@ -147,10 +145,10 @@ async fn parse_comment(payload: Bytes, state_shared: AppStateShared) -> Result<(
         .context("Failed to deserialize payload")?;
     let author = state_shared.jira.find_user_by_id(&request.comment.update_author.account_id).await.context("Failed to get author")?;
 
-    if let Some(author_email) = author.email_address {
-        if author_email.to_lowercase() == state_shared.jira.config.user.to_lowercase() {
-            return Ok(());
-        }
+    if let Some(author_email) = author.email_address
+        && author_email.to_lowercase() == state_shared.jira.config.user.to_lowercase() 
+    {
+        return Ok(());
     }
 
     let issue = Issue::get_issue(&state_shared.jira, &request.issue.id).await.context("Failed to get comment issue by id")?;
@@ -193,40 +191,37 @@ async fn parse_issue(payload: Bytes, graph_api: &MSGraphAPI) -> Result<()> {
             .changelog
             .items
             .iter()
-            .any(|i| i.field.to_lowercase() == String::from("assignee"))
+            .any(|i| i.field.to_lowercase() == "assignee")
+            && let Some(message_id) = extract_message_id_from_url(link.to_string())
+            && let Some(assignee) = request.issue.get_assignee_name() 
         {
-            if let Some(message_id) = extract_message_id_from_url(link.to_string()) {
-                if let Some(assignee) = request.issue.get_assignee_name() {
-                    let reply_body = format!("Вашей задачей будет заниматься {assignee}");
+            let reply_body = format!("Вашей задачей будет заниматься {assignee}");
 
-                    graph_api
-                        .reply_to_issue(&message_id, &reply_body)
-                        .await
-                        .context("Failed to send notification to the channel")?;
-                }
-            }
+            graph_api
+                .reply_to_issue(&message_id, &reply_body)
+                .await
+                .context("Failed to send notification to the channel")?;
         }
 
         if request
             .changelog
             .items
             .iter()
-            .any(|i| i.field.to_lowercase() == String::from("status"))
+            .any(|i| i.field.to_lowercase() == "status")
+            && let Some(message_id) = extract_message_id_from_url(link.to_string()) 
         {
-            if let Some(message_id) = extract_message_id_from_url(link.to_string()) {
-                let mut reply_body = format!("Статус задачи изменён на {}", request.issue.get_status().unwrap_or_default());
+            let mut reply_body = format!("Статус задачи изменён на {}", request.issue.get_status().unwrap_or_default());
 
-                if request.issue.get_status().map_or(false, |s| s.to_lowercase() == "Implementation/Test".to_lowercase()) {
-                    reply_body.push_str("<br>Ваша задача выполнена. Проверьте и подтвердите, что всё ОК.<br>При отсутствиие ответа эта задача автоматически закроется через 7 дней");
-                } else if request.issue.final_status() {
-                    reply_body.push_str("<br>Ваша задача закрыта. Если проблема сохранилась, заведите новую задачу");
-                }
-
-                graph_api
-                    .reply_to_issue(&message_id, &reply_body)
-                    .await
-                    .context("Failed to send notification to the channel")?;
+            if request.issue.get_status().is_some_and(|s| s.to_lowercase() == "Implementation/Test".to_lowercase()) {
+                reply_body.push_str("<br>Ваша задача выполнена. Проверьте и подтвердите, что всё ОК.<br>При отсутствиие ответа эта задача автоматически закроется через 7 дней");
+            } else if request.issue.final_status() {
+                reply_body.push_str("<br>Ваша задача закрыта. Если проблема сохранилась, заведите новую задачу");
             }
+
+            graph_api
+                .reply_to_issue(&message_id, &reply_body)
+                .await
+                .context("Failed to send notification to the channel")?;
         }
     }
 

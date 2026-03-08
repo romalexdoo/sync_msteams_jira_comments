@@ -14,7 +14,7 @@ pub(crate) struct GraphApiImage {
 }
 
 impl GraphApiImage {
-    pub(crate) async fn get(access_token: &String, url: &String) -> Result<Self> {
+    pub(crate) async fn get(access_token: &str, url: &str) -> Result<Self> {
         let client = get_reqwest_client()?;
 
         let response = client
@@ -38,11 +38,10 @@ impl GraphApiImage {
     }
 }
 
-fn get_teams_attachment_id(url: &String) -> String {
+fn get_teams_attachment_id(url: &str) -> String {
     extract_hosted_contents(url)
         .first()
-        .map(|e| get_image_id(e).ok())
-        .flatten()
+        .and_then(|e| get_image_id(e).ok())
         .unwrap_or(Uuid::new_v4().to_string())
 }
 
@@ -58,7 +57,7 @@ fn extract_hosted_contents(text: &str) -> Vec<String> {
         .collect()
 }
 
-fn get_image_id(encoded: &String) -> Result<String> {
+fn get_image_id(encoded: &str) -> Result<String> {
     let decoded = URL_SAFE.decode(encoded).context("Failed to decode string")?;
 
     let re = Regex::new(r"id=([^,]+)").unwrap();
@@ -81,15 +80,15 @@ fn get_image_id(encoded: &String) -> Result<String> {
 fn get_image_extension(headers: &HeaderMap) -> String {
     let mut extension = "ext";
     
-    if let Some(content_type) = headers.get("Content-Type") {
-        if let Ok(content_type_str) = content_type.to_str() {
-            extension = match content_type_str {
-                "image/png" => "png",
-                "image/jpeg" => "jpg",
-                "image/gif" => "gif",
-                "image/svg+xml" => "svg",
-                _ => "ext",                
-            }
+    if let Some(content_type) = headers.get("Content-Type")
+        && let Ok(content_type_str) = content_type.to_str() 
+    {
+        extension = match content_type_str {
+            "image/png" => "png",
+            "image/jpeg" => "jpg",
+            "image/gif" => "gif",
+            "image/svg+xml" => "svg",
+            _ => "ext",                
         }
     }
 
