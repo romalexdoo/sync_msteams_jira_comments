@@ -1,5 +1,5 @@
 use anyhow::{ensure, Context, Result};
-use reqwest::Client;
+use reqwest::{Client, RequestBuilder, Response, StatusCode};
 use serde::Deserialize;
 use serde_json::json;
 use tokio::{
@@ -7,6 +7,43 @@ use tokio::{
     time::{sleep, Duration},
 };
 use uuid::Uuid;
+
+/// Maximum number of retry attempts when the Graph API responds with 429 Too Many Requests.
+const MAX_THROTTLE_RETRIES: u32 = 5;
+/// Fallback delay used when the 429 response does not include a `Retry-After` header.
+const DEFAULT_THROTTLE_RETRY_SECS: u64 = 10;
+/// Upper bound to avoid sleeping for pathologically large `Retry-After` values.
+const MAX_THROTTLE_RETRY_SECS: u64 = 120;
+
+/// Send a request, transparently retrying on HTTP 429 responses.
+///
+/// Honours the `Retry-After` header (in seconds) when present; otherwise falls back
+/// to a fixed delay. Gives up after `MAX_THROTTLE_RETRIES` attempts.
+async fn send_with_throttle_retry(builder: RequestBuilder) -> Result<Response> {
+    let mut attempt: u32 = 0;
+    loop {
+        let request = builder
+            .try_clone()
+            .context("Failed to clone request for retry")?;
+
+        let response = request.send().await.context("Failed to send request")?;
+
+        if response.status() != StatusCode::TOO_MANY_REQUESTS || attempt >= MAX_THROTTLE_RETRIES {
+            return Ok(response);
+        }
+
+        let retry_after = response
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(DEFAULT_THROTTLE_RETRY_SECS)
+            .min(MAX_THROTTLE_RETRY_SECS);
+
+        sleep(Duration::from_secs(retry_after)).await;
+        attempt += 1;
+    }
+}
 
 use crate::utils::get_reqwest_client;
 
@@ -133,11 +170,12 @@ impl MSGraphAPI {
             }        
         );
 
-        let response = self.client
+        let builder = self.client
             .post(format!("https://graph.microsoft.com/v1.0/teams/{}/channels/{}/messages/{}/replies", self.config.group_id, self.config.channel_id, message_id))
             .bearer_auth(token)
-            .json(&payload)
-            .send()
+            .json(&payload);
+
+        let response = send_with_throttle_retry(builder)
             .await
             .context("Failed to send reply to issue request")?
             .error_for_status()
@@ -161,11 +199,12 @@ impl MSGraphAPI {
             }        
         );
 
-        self.client
+        let builder = self.client
             .patch(format!("https://graph.microsoft.com/v1.0/teams/{}/channels/{}/messages/{}/replies/{}", self.config.group_id, self.config.channel_id, message_id, reply_id))
             .bearer_auth(token)
-            .json(&payload)
-            .send()
+            .json(&payload);
+
+        send_with_throttle_retry(builder)
             .await
             .context("Failed to send reply edit request")?
             .error_for_status()

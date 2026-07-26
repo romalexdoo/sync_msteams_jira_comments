@@ -4,7 +4,7 @@ use axum::extract::State;
 use axum::http::{header::HeaderMap, HeaderName, StatusCode};
 use axum::response::Result as ApiResult;
 use chrono_tz::Europe::Moscow;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::Sha256;
